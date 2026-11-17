@@ -2,15 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Inbox, Search } from 'lucide-react'
 import { Topbar } from '../../App'
-import { PROCESSES, CATEGORIES, fmtDate } from '../../data'
-import { Rail, Seal, Avatar, Empty, Tag } from '../../components/ui'
+import { PROCESSES, fmtDate } from '../../data'
+import { Seal, Avatar, Empty, Tag, FilterButton } from '../../components/ui'
 
 const DEPT = 'Office of Sponsored Programs'
 
 export default function Queue({ tab }) {
   const nav = useNavigate()
   const [cat, setCat] = useState('')
-  const [tag, setTag] = useState('')
+  const [status, setStatus] = useState('any')
   const [q, setQ] = useState('')
   const dept = PROCESSES.filter((p) => p.dept === DEPT)
   const queue = dept.filter((p) => p.status === 'review').sort((a, b) => new Date(a.updated) - new Date(b.updated))
@@ -47,26 +47,34 @@ export default function Queue({ tab }) {
     )
   }
 
-  const tags = [...new Set(dept.flatMap((p) => p.tags))]
-  const rows = dept.filter((p) => (!cat || p.category === cat) && (!tag || p.tags.includes(tag)) && (!q || p.name.toLowerCase().includes(q.toLowerCase())))
+  const STATUS_OPTS = [['any', 'Any status'], ['draft', 'Draft'], ['review', 'In review'], ['returned', 'Returned'], ['approved', 'Approved']]
+  const cats = [...new Set(dept.map((p) => p.category))]
+  const rows = dept.filter((p) => (!cat || p.category === cat) && (status === 'any' || p.status === status) && (!q || p.name.toLowerCase().includes(q.toLowerCase())))
   return (
     <>
       <Topbar title="Department processes" />
       <div className="page">
         <div className="page-head"><div><p className="lede">Every process created by users in {DEPT}, in any state.</p></div></div>
         <div className="row wrap gap2">
-          <div className="search" style={{ width: 280 }}><Search /><input className="input" placeholder="Search processes" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-          <select className="select" style={{ width: 'auto' }} value={DEPT} disabled aria-label="Department"><option>{DEPT}</option></select>
-          <select className="select" style={{ width: 'auto' }} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category"><option value="">Category: any</option>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
-          <select className="select" style={{ width: 'auto' }} value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Tag"><option value="">Tag: any</option>{tags.map((c) => <option key={c}>{c}</option>)}</select>
+          <div className="search" style={{ width: 300 }}><Search /><input className="input" placeholder="Search processes" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search processes" /></div>
+          <FilterButton
+            groups={[
+              { key: 'status', label: 'Status', options: STATUS_OPTS.map(([v, l]) => [v, `${l} · ${v === 'any' ? dept.length : dept.filter((p) => p.status === v).length}`]) },
+              { key: 'cat', label: 'Category', options: [['', 'Any category'], ...cats.map((c) => [c, c])] },
+            ]}
+            values={{ status, cat }}
+            onChange={(k, v) => (k === 'status' ? setStatus(v) : setCat(v))}
+            onClear={() => { setStatus('any'); setCat('') }} />
+          <span className="hint num" style={{ marginLeft: 'auto' }}>{rows.length} of {dept.length} processes</span>
         </div>
         <div className="card">
           <table className="table">
             <thead><tr><th>Process</th><th>Creator</th><th>Status</th><th>Latest version</th><th>Updated</th></tr></thead>
             <tbody>
+              {rows.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 32 }}>No processes match these filters.</td></tr>}
               {rows.map((p) => (
                 <tr key={p.id} className="clickable" onClick={() => nav(p.status === 'review' ? `/review/${p.id}` : `/process/${p.id}`)}>
-                  <td><div className="stack" style={{ gap: 2 }}><span className="t-title">{p.name}</span><span className="hint">{p.category} · {p.tags.join(', ')}</span></div></td>
+                  <td><div className="stack" style={{ gap: 2 }}><span className="t-title">{p.name}</span><span className="hint">{p.category}</span></div></td>
                   <td className="ink2">{p.creator}</td>
                   <td><Tag status={p.status} /></td>
                   <td><div className="stack" style={{ gap: 3, alignItems: "flex-start" }}><Seal v={p.version} status={p.status} />{p.approvedVersion && p.approvedVersion !== p.version && <span className="hint">v{p.approvedVersion} is current</span>}</div></td>

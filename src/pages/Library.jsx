@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Lock, X, SearchX } from 'lucide-react'
+import { Search, Lock, SearchX } from 'lucide-react'
 import { Topbar } from '../App'
-import { PROCESSES, DEPARTMENTS, CATEGORIES, fmtDate } from '../data'
-import { Empty } from '../components/ui'
+import { PROCESSES, DEPARTMENTS } from '../data'
+import { Empty, FilterButton } from '../components/ui'
 import ProcessCard from '../components/ProcessCard'
 
 const OWN = 'Office of Sponsored Programs'
@@ -15,27 +15,19 @@ export default function LibraryPage() {
   const [q, setQ] = useState('')
   const [dept, setDept] = useState('all')
   const [cat, setCat] = useState('')
-  const [creator, setCreator] = useState('')
-  const [since, setSince] = useState('')
-  const [tag, setTag] = useState('')
 
   const approved = PROCESSES.filter((p) => p.status === 'approved' || p.approvedVersion)
   const visible = approved.filter((p) => ACCESS[p.dept] && ACCESS[p.dept] !== 'none')
-  const creators = [...new Set(visible.map((p) => p.creator))]
-  const tags = [...new Set(visible.flatMap((p) => p.tags))]
+  const cats = [...new Set(visible.map((p) => p.category))]
 
   const rows = useMemo(() => visible.filter((p) => {
     const s = q.toLowerCase()
     if (s && !(p.name.toLowerCase().includes(s) || p.tags.some((t) => t.includes(s)) || p.category.toLowerCase().includes(s))) return false
     if (dept !== 'all' && p.dept !== dept) return false
     if (cat && p.category !== cat) return false
-    if (creator && p.creator !== creator) return false
-    if (tag && !p.tags.includes(tag)) return false
-    if (since) { const d = { '30': 30, '90': 90, '365': 365 }[since]; if ((new Date('2026-11-17') - new Date(p.updated)) / 864e5 > d) return false }
     return true
-  }), [q, dept, cat, creator, since, tag])
+  }), [q, dept, cat])
 
-  const active = [cat, creator, since, tag].filter(Boolean).length
   const deptList = DEPARTMENTS.filter((d) => ACCESS[d.name])
   const count = (name) => visible.filter((p) => p.dept === name).length
 
@@ -47,12 +39,12 @@ export default function LibraryPage() {
 
         <div className="stack gap4">
           <div className="row wrap gap2">
-            <div className="search" style={{ width: 340 }}><Search /><input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, keyword or tag" aria-label="Search processes" /></div>
-            <Filter label="Category" value={cat} set={setCat} options={CATEGORIES} />
-            <Filter label="Tag" value={tag} set={setTag} options={tags} />
-            <Filter label="Creator" value={creator} set={setCreator} options={creators} />
-            <Filter label="Last updated" value={since} set={setSince} options={[['30', 'Past 30 days'], ['90', 'Past 90 days'], ['365', 'Past year']]} />
-            {active > 0 && <button className="btn ghost sm" onClick={() => { setCat(''); setCreator(''); setSince(''); setTag('') }}><X />Clear {active}</button>}
+            <div className="search" style={{ width: 300 }}><Search /><input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or keyword" aria-label="Search processes" /></div>
+            <FilterButton
+              groups={[{ key: 'cat', label: 'Category', options: [['', 'Any category'], ...cats.map((c) => [c, c])] }]}
+              values={{ cat }}
+              onChange={(k, v) => setCat(v)}
+              onClear={() => setCat('')} />
           </div>
 
           <div className="row wrap gap2" role="tablist" aria-label="Libraries">
@@ -81,15 +73,6 @@ export default function LibraryPage() {
           : <div className="card-grid">{rows.map((p) => <ProcessCard key={p.id} p={p} own={ACCESS[p.dept] === 'own'} showDept onOpen={() => nav(`/process/${p.id}`)} />)}</div>}
       </div>
     </>
-  )
-}
-
-function Filter({ label, value, set, options }) {
-  return (
-    <select className="select" style={{ width: 'auto', height: 38, fontSize: 13, background: value ? 'var(--well)' : undefined, borderColor: value ? 'var(--focus-border)' : undefined }} value={value} onChange={(e) => set(e.target.value)} aria-label={label}>
-      <option value="">{label}: any</option>
-      {options.map((o) => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o} value={o}>{o}</option>)}
-    </select>
   )
 }
 

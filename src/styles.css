@@ -142,9 +142,10 @@ p { margin: 0; }
 
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--s2); border-top: 1px solid var(--rule); padding-top: var(--s3); margin-left: calc(var(--s4) * -1); margin-right: calc(var(--s4) * -1); padding-left: var(--s4); padding-right: var(--s4); }
 .tenant-chip {
-  border-radius: var(--r-pill); padding: 6px 12px 6px 6px;
-  display: flex; flex-direction: column; gap: 2px; background: var(--well);
+  border-radius: var(--r-md); padding: 6px 8px 6px 4px;
+  display: flex; flex-direction: column; gap: 2px; background: none;
 }
+.tenant-chip:hover { background: var(--well); }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
 .topbar {
@@ -517,6 +518,7 @@ p { margin: 0; }
   .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
   .page { padding: var(--s2) var(--s4) var(--s6); }
   .topbar { padding: 0 var(--s4); }
+  .page-title { padding: var(--s4) var(--s4) 0; }
   .proc-head, .lock-banner { padding-left: var(--s4); padding-right: var(--s4); }
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .ledger { grid-template-columns: 1fr 1fr; }
@@ -565,7 +567,12 @@ p { margin: 0; }
 .ver { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-2); background: var(--well); border-radius: 6px; padding: 3px 8px; line-height: 1.2; white-space: nowrap; }
 
 /* top bar contents line up with the centred page column */
-.topbar-inner { display: flex; align-items: center; gap: var(--s4); width: 100%; height: 100%; max-width: var(--content-max); margin: 0 auto; padding: 0 var(--s8); }
+.topbar-inner { display: flex; align-items: center; gap: var(--s4); width: 100%; height: 100%; padding: 0 var(--s6); }
+/* title on the canvas, in line with the content column */
+.page-title { width: 100%; max-width: var(--content-max); margin: 0 auto; padding: var(--s6) var(--s8) 0; }
+.page-title.wide { max-width: none; }
+.page-title + .page { padding-top: var(--s4); }
+.top-title { font-size: 22px; }
 .topbar.wide .topbar-inner { max-width: none; }
 
 /* filter chips (library selector) */

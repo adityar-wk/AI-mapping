@@ -147,9 +147,9 @@ export function Topbar({ crumbs = [], title, children, wide }) {
   const { role } = useRole()
   const notes = NOTIFICATIONS[role] || null
   return (
+    <>
     <header className={`topbar ${wide ? 'wide' : ''}`}>
       <div className="topbar-inner">
-      {title && <h1 className="top-title">{title}</h1>}
       <div className="crumbs">
         {crumbs.map((c, i) => (
           <span key={i} className="row" style={{ gap: 8, minWidth: 0 }}>
@@ -164,6 +164,9 @@ export function Topbar({ crumbs = [], title, children, wide }) {
       </div>
       </div>
     </header>
+    {/* page title sits on the canvas, aligned with the content column */}
+    {title && <div className={`page-title ${wide ? 'wide' : ''}`}><h1 className="top-title">{title}</h1></div>}
+    </>
   )
 }
 
