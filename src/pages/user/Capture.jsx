@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Mic, MessageSquareText, Square, Pause, RotateCcw, PenLine, Send, Paperclip, Sparkles, AlertTriangle,
-  CheckCircle2, Loader2, X, MicOff, Users, Flag, GitBranch, Repeat, Split, CircleStop, Server, HelpCircle, FileSearch,
+  CheckCircle2, Loader2, X, MicOff, ArrowUp, Users, Flag, GitBranch, Repeat, Split, CircleStop, Server, HelpCircle, FileSearch,
 } from 'lucide-react'
 import { Topbar } from '../../App'
 import { FileIcon, Modal } from '../../components/ui'
@@ -25,10 +25,10 @@ const SEGMENTS = [
 export default function Capture() {
   const [params] = useSearchParams()
   const nav = useNavigate()
-  const [mode, setMode] = useState(params.get('mode') === 'text' ? 'text' : 'voice')
+  const startTyping = params.get('mode') === 'text'
   const [msgs, setMsgs] = useState(SEED)
-  const [segs, setSegs] = useState(SEGMENTS)
-  const [rec, setRec] = useState('recording') // recording | paused | stopped
+  const [segs, setSegs] = useState(startTyping ? [] : SEGMENTS)
+  const [rec, setRec] = useState(startTyping ? 'stopped' : 'recording') // recording | paused | stopped
   const [micDenied, setMicDenied] = useState(false)
   const [editIdx, setEditIdx] = useState(null)
   const [rerec, setRerec] = useState(null)
@@ -50,12 +50,23 @@ export default function Capture() {
     }, 1100)
   }
 
-  const sendTranscript = () => {
-    const text = segs.map((s) => s.text).join(' ')
-    setRec('stopped')
-    setSegs([])
-    sendText(text, 'voice')
+  const hasVoice = segs.length > 0
+  const canSend = hasVoice ? rerec === null : !!draft.trim()
+  const send = () => {
+    if (!canSend) return
+    if (hasVoice) {
+      const text = [segs.map((x) => x.text).join(' '), draft.trim()].filter(Boolean).join(' ')
+      setRec('stopped'); setSegs([]); setEditIdx(null)
+      sendText(text, 'voice')
+    } else sendText(draft)
   }
+  const startMic = () => {
+    if (micDenied) return
+    setRec('recording')
+    if (!segs.length) setSegs([{ t: '00:00', text: 'Then the dean signs off', live: true }])
+  }
+  const stopMic = () => { setRec('stopped'); setSegs((x) => x.map((y) => ({ ...y, live: false }))) }
+  const discard = () => { setSegs([]); setRec('stopped'); setEditIdx(null) }
 
   const doRerecord = (i) => {
     setRerec(i)
@@ -75,23 +86,18 @@ export default function Capture() {
 
       <div className="workspace" style={{ gridTemplateColumns: '1fr minmax(340px, 400px)' }}>
         {/* ── conversation ── */}
-        <section className="pane" aria-label="Conversation">
+        <section className="pane chat-pane" aria-label="Conversation">
           <div className="pane-head">
             <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Process name" style={{ background: 'transparent', border: 0, fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 600, padding: '2px 0', maxWidth: 520 }} />
-            <div className="seg" role="tablist" aria-label="Input mode">
-              <button className={mode === 'voice' ? 'on' : ''} onClick={() => setMode('voice')}><Mic />Voice</button>
-              <button className={mode === 'text' ? 'on' : ''} onClick={() => setMode('text')}><MessageSquareText />Text</button>
-            </div>
           </div>
 
           <div className="pane-body">
-            <div className="convo" style={{ maxWidth: 760, margin: '0 auto' }}>
-              <div className="msg sys"><div className="msg-body">The AI only records what you tell it or what’s in your documents. When something is missing it asks — it won’t fill gaps with guesses. Responses appear as text.</div></div>
+            <div className="convo chat">
               {msgs.map((m, i) => (
                 <div key={i} className={`msg ${m.who}`}>
-                  <span className="msg-meta">
-                    {m.who === 'ai' ? <><Sparkles />Process assistant</> : <>{m.via === 'voice' ? <Mic /> : <MessageSquareText />}You · {m.via === 'voice' ? 'transcribed' : 'typed'}</>}
-                  </span>
+                  {m.who === 'ai'
+                    ? <span className="msg-meta"><Sparkles />Process assistant</span>
+                    : <span className="msg-meta">{m.via === 'voice' ? <Mic /> : <MessageSquareText />}{m.via === 'voice' ? 'Spoken' : 'Typed'}</span>}
                   <div className="msg-body">
                     {m.text}
                     {m.qs && <ol className="qlist">{m.qs.map((q) => <li key={q}>{q}</li>)}</ol>}
@@ -99,86 +105,83 @@ export default function Capture() {
                 </div>
               ))}
               {thinking && <div className="msg ai"><span className="msg-meta"><Sparkles />Process assistant</span><div className="msg-body row gap2 muted"><Loader2 size={14} className="spin" />Reading your answer…</div></div>}
-
-              {mode === 'voice' && !micDenied && segs.length > 0 && (
-                <div className="card" style={{ background: 'var(--sheet-raised)' }}>
-                  <div className="card-head">
-                    <div className="row gap2">
-                      {rec === 'recording' ? <span className="meter" aria-label="Recording">{[0, 1, 2, 3, 4].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span> : <Mic size={15} color="var(--ink-3)" />}
-                      <h3>Live transcript</h3>
-                      <span className="hint">{rec === 'recording' ? 'Listening · English' : rec === 'paused' ? 'Paused' : 'Stopped'}</span>
-                    </div>
-                    <span className="hint">Fix anything before it’s sent</span>
-                  </div>
-                  <div style={{ padding: 8 }}>
-                    {segs.map((s, i) => (
-                      <div key={i} className={`seg-line ${s.flag ? 'flag' : ''}`}>
-                        <span className="t">{s.t}</span>
-                        <div className="stack" style={{ gap: 4 }}>
-                          {editIdx === i ? (
-                            <textarea className="textarea" autoFocus defaultValue={s.text} rows={2} onBlur={(e) => { const v = e.target.value; setSegs((x) => x.map((y, j) => (j === i ? { ...y, text: v, flag: null } : y))); setEditIdx(null) }} aria-label="Edit transcript segment" />
-                          ) : rerec === i ? (
-                            <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter">{[0, 1, 2].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Re-recording this part only…</span>
-                          ) : (
-                            <span>{s.text}{s.live && rec === 'recording' && <span className="live-caret" />}</span>
-                          )}
-                          {s.flag && rerec !== i && editIdx !== i && <span className="small row gap1" style={{ color: 'var(--returned)', gap: 6 }}><AlertTriangle size={13} />{s.flag}</span>}
-                        </div>
-                        <div className="acts">
-                          <button className="btn ghost sm icon" title="Re-record this part" aria-label="Re-record this part" onClick={() => doRerecord(i)}><RotateCcw /></button>
-                          <button className="btn ghost sm icon" title="Edit text" aria-label="Edit text" onClick={() => setEditIdx(i)}><PenLine /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {mode === 'voice' && micDenied && (
-                <div className="notice warn">
-                  <MicOff />
-                  <div className="stack gap2 grow">
-                    <span><b>Microphone access is blocked.</b> Your browser didn’t allow Process Atlas to use the microphone. Everything you’ve captured so far is saved.</span>
-                    <div className="row gap2"><button className="btn sm" onClick={() => setMode('text')}>Continue by typing</button><button className="btn sm ghost" onClick={() => setMicDenied(false)}>Try microphone again</button></div>
-                  </div>
-                </div>
-              )}
               <div ref={end} />
             </div>
           </div>
 
-          <div className="pane-foot">
-            <div style={{ maxWidth: 760, margin: '0 auto' }}>
-              {mode === 'voice' && !micDenied ? (
-                <div className="row spread wrap gap2">
-                  <div className="row gap2">
-                    {rec === 'recording'
-                      ? <button className="btn" onClick={() => setRec('paused')}><Pause />Pause</button>
-                      : <button className="btn" onClick={() => { setRec('recording'); if (!segs.length) setSegs([{ t: '00:00', text: 'Then the dean signs off', live: true }]) }}><Mic />{segs.length ? 'Resume' : 'Start speaking'}</button>}
-                    <button className="btn ghost" onClick={() => setRec('stopped')} disabled={rec === 'stopped'}><Square />Stop</button>
-                    <button className="btn ghost sm" onClick={() => setMicDenied(true)} title="Design state">Simulate mic blocked</button>
-                  </div>
-                  <div className="row gap2">
-                    <button className="btn ghost icon" aria-label="Attach documents"><Paperclip /></button>
-                    <button className="btn primary" disabled={!segs.length} onClick={sendTranscript}><Send />Send transcript</button>
-                  </div>
+          {/* ── composer: one box for voice and text, like any AI chat ── */}
+          <div className="chat-dock">
+            {micDenied && (
+              <div className="notice warn" style={{ marginBottom: 10 }}>
+                <MicOff />
+                <div className="stack gap2 grow">
+                  <span><b>Microphone access is blocked.</b> Your browser didn’t allow Process Atlas to use the microphone. Everything you’ve captured so far is saved, and you can keep typing.</span>
+                  <div className="row gap2"><button className="btn sm ghost" onClick={() => setMicDenied(false)}>Try microphone again</button></div>
                 </div>
-              ) : (
-                <div className="composer">
-                  <div className="composer-box">
-                    <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Describe a step, answer a question, or correct something (e.g. “Swap steps 3 and 4”)…"
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(draft) } }} aria-label="Message" />
-                    <div className="row spread">
-                      <div className="row gap1">
-                        <button className="btn ghost sm icon" aria-label="Attach documents"><Paperclip /></button>
-                        <button className="btn ghost sm" onClick={() => setMode('voice')}><Mic />Speak instead</button>
-                      </div>
-                      <button className="btn primary sm" onClick={() => sendText(draft)} disabled={!draft.trim()}><Send />Send</button>
-                    </div>
+              </div>
+            )}
+
+            <div className={`ai-composer ${rec === 'recording' && hasVoice ? 'rec' : ''}`}>
+              {hasVoice && (
+                <div className="ai-transcript">
+                  <div className="ai-transcript-head">
+                    {rec === 'recording'
+                      ? <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter" aria-label="Recording">{[0, 1, 2, 3, 4].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Listening · English</span>
+                      : <span className="row gap2"><Mic size={14} />{rec === 'paused' ? 'Paused' : 'Review your words, then send'}</span>}
+                    <span className="hint">Click a line to fix it</span>
                   </div>
-                  <span className="hint"><span className="kbd">Enter</span> to send · <span className="kbd">Shift</span>+<span className="kbd">Enter</span> for a new line</span>
+                  {segs.map((s, i) => (
+                    <div key={i} className={`seg-line ${s.flag ? 'flag' : ''}`}>
+                      <span className="t">{s.t}</span>
+                      <div className="stack" style={{ gap: 4 }}>
+                        {editIdx === i ? (
+                          <textarea className="textarea" autoFocus defaultValue={s.text} rows={2} onBlur={(e) => { const v = e.target.value; setSegs((x) => x.map((y, j) => (j === i ? { ...y, text: v, flag: null } : y))); setEditIdx(null) }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }} aria-label="Edit transcript line" />
+                        ) : rerec === i ? (
+                          <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter">{[0, 1, 2].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Re-recording this part only…</span>
+                        ) : (
+                          <span className="seg-text" onClick={() => setEditIdx(i)}>{s.text}{s.live && rec === 'recording' && <span className="live-caret" />}</span>
+                        )}
+                        {s.flag && rerec !== i && editIdx !== i && (
+                          <span className="small row" style={{ color: 'var(--returned)', gap: 6, flexWrap: 'wrap' }}><AlertTriangle size={13} />{s.flag}
+                            <button className="btn sm" style={{ height: 24, padding: '0 10px' }} onClick={() => setSegs((x) => x.map((y, j) => (j === i ? { ...y, text: y.text.replace('Kayuse', 'Cayuse'), flag: null } : y)))}>Use “Cayuse”</button>
+                          </span>
+                        )}
+                      </div>
+                      <div className="acts">
+                        <button className="btn ghost sm icon" title="Re-record this part" aria-label="Re-record this part" onClick={() => doRerecord(i)}><RotateCcw /></button>
+                        <button className="btn ghost sm icon" title="Edit text" aria-label="Edit text" onClick={() => setEditIdx(i)}><PenLine /></button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
+
+              <textarea className="ai-input" value={draft} onChange={(e) => setDraft(e.target.value)} rows={1}
+                placeholder={hasVoice ? 'Add anything by typing…' : 'Describe a step, answer a question, or tap the mic to talk…'}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} aria-label="Message" />
+
+              <div className="ai-bar">
+                <div className="row gap1">
+                  <button className="btn ghost icon round-sm" aria-label="Attach documents" title="Attach documents"><Paperclip /></button>
+                  {hasVoice && rec !== 'recording' && <button className="btn ghost sm" onClick={discard}><X />Discard recording</button>}
+                </div>
+                <div className="row gap2">
+                  {rec === 'recording' && hasVoice ? (
+                    <>
+                      <button className="btn ghost icon round-sm" onClick={() => setRec('paused')} aria-label="Pause" title="Pause"><Pause /></button>
+                      <button className="ai-mic on" onClick={stopMic} aria-label="Stop recording" title="Stop recording"><Square /></button>
+                    </>
+                  ) : (
+                    <button className="ai-mic" onClick={startMic} disabled={micDenied} aria-label={hasVoice ? 'Keep talking' : 'Talk'} title={micDenied ? 'Microphone blocked' : hasVoice ? 'Keep talking' : 'Talk'}>{micDenied ? <MicOff /> : <Mic />}</button>
+                  )}
+                  <button className="ai-send" onClick={send} disabled={!canSend} aria-label="Send" title="Send"><ArrowUp /></button>
+                </div>
+              </div>
+            </div>
+            <div className="chat-foot">
+              <span>The AI records only what you tell it or what’s in your documents, and asks when something is missing.</span>
+              <button className="linkish" onClick={() => setMicDenied((v) => !v)} title="Design state">{micDenied ? 'Restore mic' : 'Simulate mic blocked'}</button>
             </div>
           </div>
         </section>
