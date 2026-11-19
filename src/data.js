@@ -31,7 +31,9 @@ export const CATEGORIES = ['Grants', 'Compliance', 'Student records', 'Finance',
 
 // status: draft | review | returned | approved
 export const PROCESSES = [
-  { id: 'p-104', name: 'Grant pre-award proposal routing', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['pre-award', 'routing', 'budget'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'draft', version: '3.0', approvedVersion: '2.1', updated: '2026-11-16T15:42:00', supervisor: 'Daniel Reyes' },
+  { id: 'p-104', name: 'Grant pre-award proposal routing', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['pre-award', 'routing', 'budget'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'draft', version: '3.0', approvedVersion: '2.1', updated: '2026-11-16T15:42:00', supervisor: 'Daniel Reyes',
+    // a step that relies on another process; access is checked against the target's library
+    links: [{ step: 'n8', process: 'p-056' }] },
   { id: 'p-118', name: 'Subaward agreement setup', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['subaward', 'contracts'], creator: 'Maria Okafor', owner: 'Grants Contract Officer', status: 'review', version: '1.0', approvedVersion: null, updated: '2026-11-14T10:05:00', supervisor: 'Daniel Reyes' },
   { id: 'p-097', name: 'Effort certification cycle', dept: 'Office of Sponsored Programs', category: 'Compliance', tags: ['effort', 'federal'], creator: 'Maria Okafor', owner: 'Compliance Analyst', status: 'returned', version: '1.0', approvedVersion: null, updated: '2026-11-12T09:30:00', supervisor: 'Daniel Reyes', feedback: 'The PI attestation step is missing the 30-day deadline and what happens when a PI does not respond. Please add the escalation path to the department chair.' },
   { id: 'p-082', name: 'No-cost extension request', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['post-award', 'extension'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'approved', version: '1.2', approvedVersion: '1.2', updated: '2026-10-28T14:12:00', supervisor: 'Daniel Reyes' },
@@ -46,7 +48,7 @@ export const PROCESSES = [
 ]
 
 export const VERSIONS = [
-  { v: '3.0', state: 'draft', by: 'Daniel Reyes', at: '2026-11-10T09:14:00', summary: 'Reopened to add the federal sponsor compliance check and revise budget routing.', lastBy: 'Maria Okafor', lastAt: '2026-11-16T15:42:00' },
+  { v: '3.0', state: 'draft', reopened: true, by: 'Daniel Reyes', at: '2026-11-10T09:14:00', summary: 'Reopened to add the federal sponsor compliance check and revise budget routing.', lastBy: 'Maria Okafor', lastAt: '2026-11-16T15:42:00' },
   { v: '2.1', state: 'current', by: 'Daniel Reyes', at: '2026-06-03T11:20:00', summary: 'Dean sign-off moved after chair approval; added loop when chair requests budget revisions.', author: 'Maria Okafor' },
   { v: '2.0', state: 'historical', by: 'Daniel Reyes', at: '2026-03-18T16:05:00', summary: 'Added parallel compliance-forms track run by the Sponsored Programs Officer.', author: 'Maria Okafor' },
   { v: '1.0', state: 'historical', by: 'Angela Wu', at: '2025-11-02T10:40:00', summary: 'First approved version, captured from the 2025 OSP procedures binder.', author: 'Maria Okafor', note: 'Approver deactivated 2026-01 — record preserved' },
@@ -147,8 +149,8 @@ export const NOTIFICATIONS = {
     { id: 2, kind: 'approved', title: 'No-cost extension request approved as v1.2', body: 'Published to the Office of Sponsored Programs library.', at: 'Oct 28', to: '/process/p-082', unread: false, channel: 'In-app · Email' },
   ],
   deptAdmin: [
-    { id: 6, kind: 'attention', title: 'Nora Feld has no supervisor', body: 'Her submissions have no reviewer until you assign one.', at: '1 hour ago', to: '/dept/people?tab=structure', unread: true, channel: 'In-app' },
-    { id: 7, kind: 'people', title: 'Grace Tran accepted her invitation', body: 'She signed in with UD ADFS and is now an active supervisor.', at: 'Yesterday', to: '/dept/people?tab=sups', unread: true, channel: 'In-app · Email' },
+    { id: 6, kind: 'attention', title: 'Nora Feld has no supervisor', body: 'Their submissions have no reviewer until you assign one.', at: '1 hour ago', to: '/dept/people?tab=structure', unread: true, channel: 'In-app' },
+    { id: 7, kind: 'people', title: 'Invitation to Grace Tran is still pending', body: 'Grace Tran hasn’t signed in yet. You can resend the invitation from Users & supervisors.', at: 'Yesterday', to: '/dept/people?tab=sups', unread: true, channel: 'In-app' },
     { id: 8, kind: 'attention', title: 'Ian Whitaker left 1 unfinished draft', body: 'Transfer it to an active user so the work isn’t stranded.', at: 'Nov 12', to: '/dept/people', unread: false, channel: 'In-app' },
   ],
   supervisor: [
@@ -157,6 +159,38 @@ export const NOTIFICATIONS = {
     { id: 5, kind: 'review', title: 'Subaward agreement setup submitted', body: 'Maria Okafor submitted v1.0 for your review.', at: 'Nov 14', to: '/review/p-118', unread: false, channel: 'In-app · Email', failed: true },
   ],
 }
+
+// ── Records kept with a process, used wherever a screen summarises its sources ──
+// files: uploaded originals; decisions: what the author chose on Review extracted content;
+// capture: counted from the saved capture session.
+export const SOURCES = {
+  'p-104': {
+    files: [
+      { name: 'OSP_PreAward_Procedures_2025.pdf', ext: 'pdf', meta: '38 pages', usedIn: ['1.0', '2.0', '3.0'], confirmed: true },
+      { name: 'Routing_checklist.xlsx', ext: 'xls', meta: '2 sheets', usedIn: ['2.1', '3.0'], confirmed: true },
+    ],
+    decisions: [
+      { item: '§ 4.2 Eligibility review', outcome: 'Confirmed as extracted' },
+      { item: '§ 4.3 Routing timeline', outcome: 'Corrected by author: “5 business days”' },
+      { item: '§ 4.4 Compliance forms', outcome: 'Corrected by author: “Cayuse SP”, “IRB protocol numbers”' },
+      { item: 'Dean threshold conflict', outcome: 'Author chose: document ($250k threshold)' },
+      { item: 'Page 14', outcome: 'Unreadable — excluded', warn: true },
+    ],
+    capture: { messages: 12, voiceSeconds: 260 },
+  },
+}
+export const sourcesFor = (id) => SOURCES[id] || { files: [], decisions: [], capture: null }
+
+// ── Department summary numbers are always counted from the records, never typed in ──
+const OSP = 'Office of Sponsored Programs'
+const ospDept = DEPARTMENTS.find((d) => d.name === OSP)
+ospDept.users = USERS.length
+ospDept.supervisors = SUPERVISORS.length
+ospDept.processes = PROCESSES.filter((p) => p.dept === OSP).length
+
+export const fmtDuration = (sec) => `${Math.floor(sec / 60)} min ${sec % 60} s`
+export const fmtTime = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+export const greeting = (d = new Date()) => (d.getHours() < 12 ? 'Good morning' : d.getHours() < 17 ? 'Good afternoon' : 'Good evening')
 
 export const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 export const fmtDateTime = (iso) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })

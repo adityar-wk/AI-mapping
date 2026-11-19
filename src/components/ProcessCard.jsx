@@ -1,4 +1,4 @@
-import { ArrowRight, PenLine, Eye, Landmark, ShieldCheck, GraduationCap, Wallet, UserPlus, Megaphone } from 'lucide-react'
+import { ArrowRight, PenLine, Eye, Folder, Landmark, ShieldCheck, GraduationCap, Wallet, UserPlus, Megaphone } from 'lucide-react'
 import { fmtDate } from '../data'
 import { Seal } from './ui'
 
@@ -12,7 +12,7 @@ const CAT_ICON = { Grants: Landmark, Compliance: ShieldCheck, 'Student records':
 const STATUS = { draft: ['Draft', 'draft'], review: ['In review', 'review'], returned: ['Returned', 'returned'], approved: ['Approved', 'approved'] }
 
 export default function ProcessCard({ p, onOpen, showDept, own = true, mine = false }) {
-  const Icon = CAT_ICON[p.category] || Landmark
+  const Icon = CAT_ICON[p.category] || Folder
   const [label, cls] = STATUS[p.status]
   const editable = mine && (p.status === 'draft' || p.status === 'returned')
   const version = mine ? p.version : p.approvedVersion

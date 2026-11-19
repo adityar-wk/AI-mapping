@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Mic, MessageSquareText, Square, Pause, RotateCcw, PenLine, Paperclip, Sparkles, AlertTriangle,
+  Mic, MessageSquareText, Square, Pause, Paperclip, Sparkles, AlertTriangle,
   CheckCircle2, Loader2, X, MicOff, ArrowUp, Users, Flag, GitBranch, Repeat, Split, CircleStop, Server, HelpCircle, FileSearch,
   ChevronRight, CornerDownRight, Workflow,
 } from 'lucide-react'
 import { Topbar } from '../../App'
 import { FileIcon, Modal } from '../../components/ui'
+import { fmtTime } from '../../data'
 
 /* ── upload rules (SOW 3.2) ── */
 const ALLOWED = ['pdf', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg']
@@ -21,6 +22,7 @@ const Q_SIGNOFF = { q: 'Who gives final sign-off before the proposal goes to the
 const Q_REJECT = { q: 'What happens if the sponsor portal rejects the submission?', kind: 'Exception', options: ['The officer fixes it and resubmits', 'The PI is notified and it stops there'] }
 const Q_WRAP = { q: 'Is there anything else in this process, or have we covered everything?', kind: 'Wrap-up', options: ['That’s everything', 'I have more to add'], wrap: true }
 
+/* questions are asked inside the thread; once answered they stay in the history as an AI turn */
 const SEED = [
   { who: 'ai', text: 'Let’s document a process. In your own words, what is the process called and what usually kicks it off?' },
   { who: 'me', via: 'voice', text: 'It’s our grant pre-award routing. It starts when a PI finds a funding opportunity and sends us an intent to apply.' },
@@ -33,11 +35,50 @@ const SEED = [
 ]
 
 const SEGMENTS = [
-  { t: '00:04', text: 'After it’s eligible the PI drafts the budget and narrative,' },
-  { t: '00:09', text: 'and at the same time our officer prepares the compliance forms in Kayuse.', flag: 'Low confidence: “Kayuse” — did you mean “Cayuse”?' },
-  { t: '00:15', text: 'Then the department chair reviews the whole package.' },
-  { t: '00:19', text: 'If the chair wants changes it goes back to the PI to revise the budget', live: true },
+  { text: 'After it’s eligible the PI drafts the budget and narrative,' },
+  { text: 'and at the same time our officer prepares the compliance forms in Kayuse.', flag: 'Kayuse', fix: 'Cayuse' },
+  { text: 'Then the department chair reviews the whole package.' },
+  { text: 'If the chair wants changes it goes back to the PI to revise the budget' },
 ]
+
+/*
+  What has been captured, rebuilt from the conversation state. In production the model returns this
+  structure after each turn; here it follows the scripted turns and the answers actually given,
+  so the side panel and the summary never show anything the person hasn't said.
+*/
+function captured(stage, answers, skipped) {
+  const c = {
+    Roles: ['Principal Investigator', 'Sponsored Programs Officer'],
+    Trigger: ['PI identifies a funding opportunity'],
+    Steps: ['Submit intent to apply', 'Review eligibility and deadline'],
+    Decisions: ['Eligible? (Yes / No)'],
+    Parallel: [], Loops: [],
+    Endpoints: ['Not eligible — PI notified'],
+    Systems: [],
+    'Not yet described': skipped.map((q) => ({ [Q_SIGNOFF.q]: 'Final sign-off', [Q_REJECT.q]: 'Portal rejection' }[q] || q)),
+  }
+  if (stage === 'order') return c
+  const par = /same time|parallel/i.test(answers.Sequence || '')
+  c.Roles.push('Department Chair')
+  c.Steps.push('Draft budget and narrative', 'Prepare compliance forms', 'Review proposal package')
+  c.Decisions.push('Chair approves? (Yes / Revise)')
+  if (par) c.Parallel.push('Budget ∥ compliance forms')
+  c.Loops.push('Revise → Draft budget')
+  c.Systems.push('Cayuse SP')
+  if (stage === 'details') return c
+  const so = answers.Responsibility
+  if (so && /dean/i.test(so)) {
+    c.Roles.push('Dean')
+    if (/threshold/i.test(so)) { c.Decisions.push('Above budget threshold?'); c.Steps.push('Dean sign-off (above threshold)') } else c.Steps.push('Dean sign-off')
+  } else if (so) c.Steps.push(`Final sign-off: ${so}`)
+  c.Steps.push('Submit through sponsor portal')
+  c.Systems.push('Sponsor portal')
+  const rj = answers.Exception
+  if (rj && /resubmit|fix/i.test(rj)) c.Loops.push('Portal rejects → correct and resubmit')
+  else if (rj) c.Endpoints.push('Portal rejected — PI notified')
+  c.Endpoints.push('Proposal submitted')
+  return c
+}
 
 const isDone = (t) => /everything|that'?’?s all|done|nothing else|covered/i.test(t)
 
@@ -49,8 +90,7 @@ export default function Capture() {
   const [segs, setSegs] = useState(startTyping ? [] : SEGMENTS)
   const [rec, setRec] = useState(startTyping ? 'stopped' : 'recording') // recording | paused | stopped
   const [micDenied, setMicDenied] = useState(false)
-  const [editIdx, setEditIdx] = useState(null)
-  const [rerec, setRerec] = useState(null)
+  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [files, setFiles] = useState([]) // attached to the next message
   const [thinking, setThinking] = useState(false)
@@ -59,6 +99,8 @@ export default function Capture() {
   const [ask, setAsk] = useState({ list: [Q_ORDER], i: 0 }) // current question set, or null
   const [stage, setStage] = useState('order') // order | details | wrap | more | done
   const [skipped, setSkipped] = useState([])
+  const [answers, setAnswers] = useState({}) // question kind → the person's answer
+  const [savedAt, setSavedAt] = useState(() => new Date())
   const skippedRef = useRef([])
   const end = useRef(null)
   const fileInput = useRef(null)
@@ -67,7 +109,8 @@ export default function Capture() {
 
   const done = stage === 'done'
   const current = ask ? ask.list[ask.i] : null
-  const unconfirmedDocs = msgs.some((m) => m.attach?.some((f) => f.state === 'review'))
+  const unconfirmedDocs = msgs.reduce((n, m) => n + (m.attach?.filter((f) => f.state === 'review').length || 0), 0)
+  const cap = captured(stage, answers, skipped)
 
   const aiSay = (m) => setMsgs((x) => [...x, { who: 'ai', ...m }])
 
@@ -79,7 +122,8 @@ export default function Capture() {
     setTimeout(() => {
       setThinking(false)
       if (stage === 'order') {
-        aiSay({ text: 'Understood — the budget and compliance forms run in parallel, then the chair reviews the package as a decision with a “Revise” loop back to the budget. Two more things I need:' })
+        const par = /same time|parallel/i.test(text)
+        aiSay({ text: `Understood — ${par ? 'the budget and compliance forms run in parallel' : `“${text}”, so I’ve kept them in sequence`}, then the chair reviews the package as a decision with a “Revise” loop back to the budget. Two more things I need:` })
         setAsk({ list: [Q_SIGNOFF, Q_REJECT], i: 0 }); setStage('details')
       } else if (stage === 'details') {
         const got = [Q_SIGNOFF, Q_REJECT].filter((q) => !skippedRef.current.includes(q.q))
@@ -103,8 +147,11 @@ export default function Capture() {
     const ok = files.filter((f) => !f.err)
     if (!text.trim() && !ok.length) return
     const attach = ok.map((f) => ({ ...f, state: 'processing' }))
-    const idx = msgs.length
-    setMsgs((m) => [...m, { who: 'me', via, text, attach: attach.length ? attach : undefined }])
+    const q = text.trim() && current && !thinking ? [{ who: 'ai', text: current.q, kind: current.kind }] : []
+    if (q.length) setAnswers((a) => ({ ...a, [current.kind]: text.trim() }))
+    setSavedAt(new Date())
+    const idx = msgs.length + q.length
+    setMsgs((m) => [...m, ...q, { who: 'me', via, text, attach: attach.length ? attach : undefined }])
     setDraft(''); setFiles([])
     if (attach.length) {
       setTimeout(() => setMsgs((m) => m.map((x, j) => (j === idx ? { ...x, attach: x.attach.map((f) => ({ ...f, state: 'done' })) } : x))), 2200)
@@ -122,36 +169,32 @@ export default function Capture() {
   const skip = () => {
     skippedRef.current = [...skippedRef.current, current.q]
     setSkipped(skippedRef.current)
-    setMsgs((m) => [...m, { who: 'skip', text: current.q }])
+    setMsgs((m) => [...m, { who: 'ai', text: current.q, kind: current.kind }, { who: 'skip', text: current.q }])
     advance('')
   }
 
   const hasVoice = segs.length > 0
   const validFiles = files.filter((f) => !f.err).length
-  const canSend = hasVoice ? rerec === null : !!draft.trim() || validFiles > 0
+  const canSend = hasVoice ? !editing : !!draft.trim() || validFiles > 0
   const send = () => {
     if (!canSend) return
     if (hasVoice) {
       const text = [segs.map((x) => x.text).join(' '), draft.trim()].filter(Boolean).join(' ')
-      setRec('stopped'); setSegs([]); setEditIdx(null)
+      setRec('stopped'); setSegs([]); setEditing(false)
       post(text, 'voice')
     } else post(draft, 'text')
   }
   const startMic = () => {
     if (micDenied) return
     setRec('recording')
-    if (!segs.length) setSegs([{ t: '00:00', text: 'Then the dean signs off', live: true }])
+    if (!segs.length) setSegs([{ text: 'Then the dean signs off' }])
   }
-  const stopMic = () => { setRec('stopped'); setSegs((x) => x.map((y) => ({ ...y, live: false }))) }
-  const discard = () => { setSegs([]); setRec('stopped'); setEditIdx(null) }
+  const stopMic = () => setRec('stopped')
+  const discard = () => { setSegs([]); setRec('stopped'); setEditing(false) }
 
-  const doRerecord = (i) => {
-    setRerec(i)
-    setTimeout(() => {
-      setSegs((s) => s.map((x, j) => (j === i ? { ...x, text: 'and at the same time our officer prepares the compliance forms in Cayuse.', flag: null } : x)))
-      setRerec(null)
-    }, 1600)
-  }
+  const transcript = segs.map((x) => x.text).join(' ')
+  const flagged = segs.find((x) => x.flag)
+  const applyFix = () => setSegs((x) => x.map((y) => (y.flag ? { text: y.text.replace(y.flag, y.fix) } : y)))
 
   const pickFiles = (list) => {
     const already = msgs.reduce((n, m) => n + (m.attach?.length || 0), 0) + validFiles
@@ -169,7 +212,7 @@ export default function Capture() {
   return (
     <>
       <Topbar wide crumbs={[{ label: 'My processes', to: '/home' }, { label: 'New process' }]}>
-        <span className="save"><CheckCircle2 />Draft saved 2 min ago</span>
+        <span className="save"><CheckCircle2 />Draft saved {fmtTime(savedAt)}</span>
         <button className="btn" onClick={() => nav('/home')}>Save & exit</button>
         <span data-tip={done ? undefined : 'Available once you’ve covered every step'}>
           <button className="btn primary" disabled={!done} onClick={() => setConfirmGen(true)}><Sparkles />Generate map & document</button>
@@ -190,7 +233,7 @@ export default function Capture() {
               ) : (
                 <div key={i} className={`msg ${m.who}`}>
                   {m.who === 'ai'
-                    ? <span className="msg-meta"><Sparkles />Process assistant</span>
+                    ? <span className="msg-meta"><Sparkles />Process assistant{m.kind && <span className="q-kind">{m.kind}</span>}</span>
                     : <span className="msg-meta">{m.via === 'voice' ? <Mic /> : m.via === 'choice' ? <CheckCircle2 /> : <MessageSquareText />}{m.via === 'voice' ? 'Spoken' : m.via === 'choice' ? 'Answered' : 'Typed'}</span>}
                   {m.text && <div className="msg-body">{m.text}</div>}
                   {m.attach && (
@@ -209,9 +252,19 @@ export default function Capture() {
                       ))}
                     </div>
                   )}
-                  {m.done && <DoneCard skipped={skipped.length} onGenerate={() => setConfirmGen(true)} />}
+                  {m.done && <DoneCard cap={cap} onGenerate={() => setConfirmGen(true)} />}
                 </div>
               )))}
+              {current && !thinking && (
+                <div className="msg ai" role="group" aria-label="Question from the assistant">
+                  <span className="msg-meta"><Sparkles />Process assistant<span className="q-kind">{current.kind}{ask.list.length > 1 && ` · ${ask.i + 1} of ${ask.list.length}`}</span></span>
+                  <div className="msg-body">{current.q}</div>
+                  <div className="q-opts">
+                    {current.options.map((o) => <button key={o} className="q-opt" onClick={() => choose(o)}>{o}</button>)}
+                    {!current.wrap && <button className="q-skip" onClick={skip}>Skip for now</button>}
+                  </div>
+                </div>
+              )}
               {thinking && <div className="msg ai"><span className="msg-meta"><Sparkles />Process assistant</span><div className="msg-body row gap2 muted"><Loader2 size={14} className="spin" />Thinking…</div></div>}
               <div ref={end} />
             </div>
@@ -229,23 +282,7 @@ export default function Capture() {
               </div>
             )}
 
-            {current && !thinking && (
-              <div className="ask-card" role="group" aria-label="Question from the assistant">
-                <div className="ask-head">
-                  <span className="ask-kind"><HelpCircle size={13} />{current.kind}{ask.list.length > 1 && <span className="muted"> · {ask.i + 1} of {ask.list.length}</span>}</span>
-                  {!current.wrap && <button className="btn ghost sm" onClick={skip}>Skip</button>}
-                </div>
-                <p className="ask-q">{current.q}</p>
-                <div className="ask-opts">
-                  {current.options.map((o, k) => (
-                    <button key={o} className="ask-opt" onClick={() => choose(o)}><span className="ask-n">{k + 1}</span>{o}<ChevronRight className="ask-go" /></button>
-                  ))}
-                </div>
-                <span className="ask-or">Or answer in your own words below — type or tap the mic</span>
-              </div>
-            )}
-
-            <div className={`ai-composer ${rec === 'recording' && hasVoice ? 'rec' : ''} ${current && !thinking ? 'joined' : ''}`}>
+            <div className={`ai-composer ${rec === 'recording' && hasVoice ? 'rec' : ''}`}>
               {files.length > 0 && (
                 <div className="comp-files">
                   {files.map((f, i) => (
@@ -267,32 +304,23 @@ export default function Capture() {
                     {rec === 'recording'
                       ? <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter" aria-label="Recording">{[0, 1, 2, 3, 4].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Listening · English</span>
                       : <span className="row gap2"><Mic size={14} />{rec === 'paused' ? 'Paused' : 'Review your words, then send'}</span>}
-                    <span className="hint">Click a line to fix it</span>
+                    <span className="hint">{editing ? 'Press Enter when done' : 'Click the text to edit'}</span>
                   </div>
-                  {segs.map((s, i) => (
-                    <div key={i} className={`seg-line ${s.flag ? 'flag' : ''}`}>
-                      <span className="t">{s.t}</span>
-                      <div className="stack" style={{ gap: 4 }}>
-                        {editIdx === i ? (
-                          <textarea className="textarea" autoFocus defaultValue={s.text} rows={2} onBlur={(e) => { const v = e.target.value; setSegs((x) => x.map((y, j) => (j === i ? { ...y, text: v, flag: null } : y))); setEditIdx(null) }}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }} aria-label="Edit transcript line" />
-                        ) : rerec === i ? (
-                          <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter">{[0, 1, 2].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Re-recording this part only…</span>
-                        ) : (
-                          <span className="seg-text" onClick={() => setEditIdx(i)}>{s.text}{s.live && rec === 'recording' && <span className="live-caret" />}</span>
-                        )}
-                        {s.flag && rerec !== i && editIdx !== i && (
-                          <span className="small row" style={{ color: 'var(--returned)', gap: 6, flexWrap: 'wrap' }}><AlertTriangle size={13} />{s.flag}
-                            <button className="btn sm" style={{ height: 24, padding: '0 10px' }} onClick={() => setSegs((x) => x.map((y, j) => (j === i ? { ...y, text: y.text.replace('Kayuse', 'Cayuse'), flag: null } : y)))}>Use “Cayuse”</button>
-                          </span>
-                        )}
-                      </div>
-                      <div className="acts">
-                        <button className="btn ghost sm icon" title="Re-record this part" aria-label="Re-record this part" onClick={() => doRerecord(i)}><RotateCcw /></button>
-                        <button className="btn ghost sm icon" title="Edit text" aria-label="Edit text" onClick={() => setEditIdx(i)}><PenLine /></button>
-                      </div>
-                    </div>
-                  ))}
+                  {editing ? (
+                    <textarea className="tr-edit" autoFocus defaultValue={transcript} rows={4} aria-label="Edit transcript"
+                      onBlur={(e) => { const v = e.target.value.trim(); setSegs(v ? [{ text: v }] : []); setEditing(false) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }} />
+                  ) : (
+                    <p className="tr-para" onClick={() => { if (rec === 'recording') setRec('paused'); setEditing(true) }} title="Click to edit">
+                      {segs.map((s, i) => (
+                        <span key={i}>{i > 0 && ' '}{s.flag ? s.text.split(s.flag).flatMap((part, k) => (k ? [<mark key={k} className="tr-flag">{s.flag}</mark>, part] : [part])) : s.text}</span>
+                      ))}
+                      {rec === 'recording' && <span className="live-caret" />}
+                    </p>
+                  )}
+                  {flagged && !editing && (
+                    <span className="tr-fix"><AlertTriangle size={13} />Did you mean “{flagged.fix}”?<button className="btn sm" onClick={applyFix}>Use “{flagged.fix}”</button></span>
+                  )}
                 </div>
               )}
 
@@ -330,7 +358,7 @@ export default function Capture() {
         <aside className="pane" aria-label="Captured so far" style={{ background: 'var(--paper)' }}>
           <div className="pane-head"><h3 style={{ fontFamily: 'var(--sans)' }}>Captured so far</h3><span className="hint">Updates as you talk</span></div>
           <div className="pane-body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Structure />
+            <Structure cap={cap} />
           </div>
         </aside>
       </div>
@@ -339,7 +367,7 @@ export default function Capture() {
         <Modal title="Generate map and document?" sub="Both outputs are created together from the same captured information." onClose={() => setConfirmGen(false)}
           foot={<><button className="btn ghost" onClick={() => setConfirmGen(false)}>Not yet</button><button className="btn primary" onClick={() => nav('/process/p-104/edit?generated=1')}><Sparkles />Generate</button></>}>
           {skipped.length > 0 && <div className="notice warn"><HelpCircle /><span><b>{skipped.length} question{skipped.length > 1 ? 's were' : ' was'} skipped.</b> Missing details will appear as “not yet described” in the document rather than being filled in.</span></div>}
-          {unconfirmedDocs && <div className="notice info"><FileSearch /><span>1 uploaded document has extracted content you haven’t confirmed. Unconfirmed content won’t be used.</span></div>}
+          {unconfirmedDocs > 0 && <div className="notice info"><FileSearch /><span>{unconfirmedDocs} uploaded document{unconfirmedDocs > 1 ? 's have' : ' has'} extracted content you haven’t confirmed. Unconfirmed content won’t be used.</span></div>}
           {!skipped.length && !unconfirmedDocs && <div className="notice ok"><CheckCircle2 /><span>Every question is answered and all documents are confirmed.</span></div>}
         </Modal>
       )}
@@ -348,15 +376,16 @@ export default function Capture() {
   )
 }
 
-/* ── shown in the thread once the user confirms they've covered everything ── */
-function DoneCard({ skipped, onGenerate }) {
-  const stats = [['Roles', 4], ['Steps', 9], ['Decisions', 2], ['Loops', 1], ['Parallel', 1], ['Endpoints', 3]]
+/* ── shown in the thread once the user confirms they've covered everything; counts come from the captured structure ── */
+function DoneCard({ cap, onGenerate }) {
+  const stats = ['Roles', 'Steps', 'Decisions', 'Loops', 'Parallel', 'Endpoints'].map((k) => [k, cap[k].length])
+  const open = cap['Not yet described'].length
   return (
     <div className="done-card">
       <div className="done-stats">
         {stats.map(([k, v]) => <div key={k}><b className="num">{v}</b><span>{k}</span></div>)}
       </div>
-      {skipped > 0 && <span className="small row gap2" style={{ color: 'var(--returned)' }}><HelpCircle size={13} />{skipped} skipped question{skipped > 1 ? 's' : ''} will show as “not yet described”</span>}
+      {open > 0 && <span className="small row gap2" style={{ color: 'var(--returned)' }}><HelpCircle size={13} />{open} skipped question{open > 1 ? 's' : ''} will show as “not yet described”</span>}
       <div className="row gap2 wrap">
         <button className="btn primary" onClick={onGenerate}><Workflow />Generate swimlane & document</button>
         <span className="hint">You can still add more — just keep typing.</span>
@@ -365,28 +394,24 @@ function DoneCard({ skipped, onGenerate }) {
   )
 }
 
-function Structure() {
-  const rows = [
-    [Users, 'Roles', ['Principal Investigator', 'Sponsored Programs Officer', 'Department Chair']],
-    [Flag, 'Trigger', ['PI identifies a funding opportunity']],
-    [CircleStop, 'Steps', ['Submit intent to apply', 'Review eligibility and deadline', 'Draft budget and narrative', 'Prepare compliance forms', 'Review proposal package']],
-    [GitBranch, 'Decisions', ['Eligible? (Yes / No)', 'Chair approves? (Yes / Revise)']],
-    [Split, 'Parallel', ['Budget ∥ compliance forms']],
-    [Repeat, 'Loops', ['Revise → Draft budget']],
-    [CircleStop, 'Endpoints', ['Not eligible — PI notified']],
-    [Server, 'Systems', ['Cayuse SP', 'Sponsor portal']],
-  ]
+const ROW_ICON = { Roles: Users, Trigger: Flag, Steps: CircleStop, Decisions: GitBranch, Parallel: Split, Loops: Repeat, Endpoints: CircleStop, Systems: Server, 'Not yet described': HelpCircle }
+
+function Structure({ cap }) {
+  const rows = Object.entries(cap).filter(([, items]) => items.length)
   return (
     <div className="card">
-      {rows.map(([I, k, items], i) => (
-        <div key={k} className="row" style={{ alignItems: 'flex-start', padding: '10px 14px', borderTop: i ? '1px solid var(--rule-soft)' : 0, gap: 10 }}>
-          <I size={14} color="var(--ink-3)" style={{ marginTop: 3 }} />
-          <div className="stack grow" style={{ gap: 4 }}>
-            <span className="row spread"><span className="small" style={{ fontWeight: 600 }}>{k}</span><span className="hint num">{items.length}</span></span>
-            <div className="row wrap" style={{ gap: 4 }}>{items.map((x) => <span key={x} className="chip">{x}</span>)}</div>
+      {rows.map(([k, items], i) => {
+        const I = ROW_ICON[k]
+        return (
+          <div key={k} className="row" style={{ alignItems: 'flex-start', padding: '10px 14px', borderTop: i ? '1px solid var(--rule-soft)' : 0, gap: 10 }}>
+            <I size={14} color={k === 'Not yet described' ? 'var(--returned)' : 'var(--ink-3)'} style={{ marginTop: 3 }} />
+            <div className="stack grow" style={{ gap: 4 }}>
+              <span className="row spread"><span className="small" style={{ fontWeight: 600 }}>{k}</span><span className="hint num">{items.length}</span></span>
+              <div className="row wrap" style={{ gap: 4 }}>{items.map((x) => <span key={x} className="chip">{x}</span>)}</div>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
