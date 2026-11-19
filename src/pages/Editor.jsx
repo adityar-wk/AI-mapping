@@ -175,13 +175,13 @@ export default function Editor({ mode }) {
               {view !== 'doc' && (
                 <div className="map-wrap out-col">
                   <div style={{ padding: 16, paddingBottom: view === 'map' ? 220 : 16 }}>
-                    <div style={{ border: '1px solid var(--rule)', borderRadius: 8, width: 'max-content', background: 'var(--sheet)' }}>
+                    <div style={{ border: '1px solid var(--rule)', borderRadius: 8, width: 'max-content', background: 'var(--sheet)', margin: view === 'map' ? '0 auto' : undefined }}>
                       <Swimlane lanes={LANES} nodes={nodes} edges={edges} offsets={offsets} onMove={onMove} editable={!locked}
                         selected={sel} onSelect={(x) => { setSel(x); if (x) { setSelEdge(null); setPanel('edit') } }}
                         selectedEdge={selEdge} onSelectEdge={locked ? undefined : (x) => { setSelEdge(x); if (x) { setSel(null); setPanel('edit') } }}
                         changed={changed} />
                     </div>
-                    <div style={{ marginTop: 12 }}><MapLegend /></div>
+                    <div style={{ marginTop: 12, display: 'flex', justifyContent: view === 'map' ? 'center' : 'flex-start' }}><MapLegend /></div>
                   </div>
                 </div>
               )}
