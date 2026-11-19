@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Mic, MessageSquareText, Square, Pause, Paperclip, Sparkles, AlertTriangle,
+  Mic, MessageSquareText, Square, Pause, Paperclip, RotateCcw, Sparkles, AlertTriangle,
   CheckCircle2, Loader2, X, MicOff, ArrowUp, Users, Flag, GitBranch, Repeat, Split, CircleStop, Server, HelpCircle, FileSearch,
   ChevronRight, CornerDownRight, Workflow,
 } from 'lucide-react'
@@ -46,7 +46,7 @@ const SEGMENTS = [
   structure after each turn; here it follows the scripted turns and the answers actually given,
   so the side panel and the summary never show anything the person hasn't said.
 */
-function captured(stage, answers, skipped) {
+function baseCapture(stage, answers, skipped) {
   const c = {
     Roles: ['Principal Investigator', 'Sponsored Programs Officer'],
     Trigger: ['PI identifies a funding opportunity'],
@@ -80,6 +80,30 @@ function captured(stage, answers, skipped) {
   return c
 }
 
+// spoken or typed corrections such as “Actually, approval comes after step 3”
+const CORR = /(.+?)\s+(?:comes|should come|happens|goes|should be|is)\s+(after|before)\s+(.+)/i
+const isCorrection = (t) => CORR.test(t) && /\b(actually|comes?|move|should)\b/i.test(t)
+const SYN = { approval: ['sign-off', 'approves'], approve: ['sign-off', 'approves'], budget: ['budget'], forms: ['compliance'], portal: ['portal'] }
+function findStep(steps, phrase) {
+  const n = phrase.match(/step\s*(\d+)/i)
+  if (n) return steps[Number(n[1]) - 1]
+  const words = (phrase.toLowerCase().replace(/^actually,?\s*/, '').match(/[a-z-]{4,}/g) || []).flatMap((w) => [w, ...(SYN[w] || [])])
+  return steps.find((st) => words.some((w) => st.toLowerCase().includes(w)))
+}
+
+function captured(stage, answers, skipped, corrections = []) {
+  const c = baseCapture(stage, answers, skipped)
+  corrections.forEach(({ move, rel, target }) => {
+    const st = c.Steps
+    const i = st.indexOf(move)
+    if (i < 0 || !st.includes(target)) return
+    st.splice(i, 1)
+    const j = st.indexOf(target)
+    st.splice(rel === 'after' ? j + 1 : j, 0, move)
+  })
+  return c
+}
+
 const isDone = (t) => /everything|that'?’?s all|done|nothing else|covered/i.test(t)
 
 export default function Capture() {
@@ -100,6 +124,9 @@ export default function Capture() {
   const [stage, setStage] = useState('order') // order | details | wrap | more | done
   const [skipped, setSkipped] = useState([])
   const [answers, setAnswers] = useState({}) // question kind → the person's answer
+  const [corrections, setCorrections] = useState([])
+  const [pick, setPick] = useState(false) // choosing which part of the transcript to re-record
+  const [rerec, setRerec] = useState(null)
   const [savedAt, setSavedAt] = useState(() => new Date())
   const skippedRef = useRef([])
   const end = useRef(null)
@@ -110,7 +137,7 @@ export default function Capture() {
   const done = stage === 'done'
   const current = ask ? ask.list[ask.i] : null
   const unconfirmedDocs = msgs.reduce((n, m) => n + (m.attach?.filter((f) => f.state === 'review').length || 0), 0)
-  const cap = captured(stage, answers, skipped)
+  const cap = captured(stage, answers, skipped, corrections)
 
   const aiSay = (m) => setMsgs((x) => [...x, { who: 'ai', ...m }])
 
@@ -143,8 +170,31 @@ export default function Capture() {
     }, 900)
   }
 
+  const correct = (text) => {
+    setThinking(true)
+    setTimeout(() => {
+      setThinking(false)
+      const m = text.match(CORR)
+      const a = m && findStep(cap.Steps, m[1])
+      const b = m && findStep(cap.Steps, m[3])
+      if (!a || !b || a === b) {
+        aiSay({ text: `Which steps do you mean? Name both, for example “${cap.Steps[cap.Steps.length - 1]} comes after ${cap.Steps[1]}”, or use the step number.` })
+        return
+      }
+      const rel = m[2].toLowerCase()
+      setCorrections((c) => [...c, { move: a, rel, target: b }])
+      aiSay({ text: `Updated — “${a}” now comes ${rel} “${b}”. You can see the new order in Captured so far.` })
+    }, 800)
+  }
+
   const post = (text, via) => {
     const ok = files.filter((f) => !f.err)
+    if (text.trim() && !ok.length && isCorrection(text)) {
+      setMsgs((m) => [...m, { who: 'me', via, text }])
+      setDraft(''); setFiles([]); setSavedAt(new Date())
+      correct(text)
+      return
+    }
     if (!text.trim() && !ok.length) return
     const attach = ok.map((f) => ({ ...f, state: 'processing' }))
     const q = text.trim() && current && !thinking ? [{ who: 'ai', text: current.q, kind: current.kind }] : []
@@ -175,7 +225,7 @@ export default function Capture() {
 
   const hasVoice = segs.length > 0
   const validFiles = files.filter((f) => !f.err).length
-  const canSend = hasVoice ? !editing : !!draft.trim() || validFiles > 0
+  const canSend = hasVoice ? !editing && rerec === null : !!draft.trim() || validFiles > 0
   const send = () => {
     if (!canSend) return
     if (hasVoice) {
@@ -193,6 +243,13 @@ export default function Capture() {
   const discard = () => { setSegs([]); setRec('stopped'); setEditing(false) }
 
   const transcript = segs.map((x) => x.text).join(' ')
+  const doRerecord = (i) => {
+    setPick(false); setRerec(i)
+    setTimeout(() => {
+      setSegs((x) => x.map((y, j) => (j === i ? { text: y.flag ? y.text.replace(y.flag, y.fix) : y.text } : y)))
+      setRerec(null)
+    }, 1600)
+  }
   const flagged = segs.find((x) => x.flag)
   const applyFix = () => setSegs((x) => x.map((y) => (y.flag ? { text: y.text.replace(y.flag, y.fix) } : y)))
 
@@ -304,16 +361,22 @@ export default function Capture() {
                     {rec === 'recording'
                       ? <span className="row gap2" style={{ color: 'var(--navy)' }}><span className="meter" aria-label="Recording">{[0, 1, 2, 3, 4].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Listening · English</span>
                       : <span className="row gap2"><Mic size={14} />{rec === 'paused' ? 'Paused' : 'Review your words, then send'}</span>}
-                    <span className="hint">{editing ? 'Press Enter when done' : 'Click the text to edit'}</span>
+                    {editing ? <span className="hint">Press Enter when done</span> : pick
+                      ? <span className="row gap2"><span className="hint">Choose the part to re-record</span><button className="btn ghost sm" onClick={() => setPick(false)}>Cancel</button></span>
+                      : <span className="row gap2"><span className="hint">Click the text to edit</span><button className="btn ghost sm" disabled={rerec !== null} onClick={() => { if (rec === 'recording') setRec('paused'); setPick(true) }}><RotateCcw />Re-record a part</button></span>}
                   </div>
                   {editing ? (
                     <textarea className="tr-edit" autoFocus defaultValue={transcript} rows={4} aria-label="Edit transcript"
-                      onBlur={(e) => { const v = e.target.value.trim(); setSegs(v ? [{ text: v }] : []); setEditing(false) }}
+                      onBlur={(e) => { const v = e.target.value.trim(); setSegs(v ? v.split(/(?<=[.,;!?])\s+/).map((t) => ({ text: t })) : []); setEditing(false) }}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }} />
                   ) : (
-                    <p className="tr-para" onClick={() => { if (rec === 'recording') setRec('paused'); setEditing(true) }} title="Click to edit">
+                    <p className={`tr-para ${pick ? 'picking' : ''}`} onClick={() => { if (pick || rerec !== null) return; if (rec === 'recording') setRec('paused'); setEditing(true) }} title={pick ? undefined : 'Click to edit'}>
                       {segs.map((s, i) => (
-                        <span key={i}>{i > 0 && ' '}{s.flag ? s.text.split(s.flag).flatMap((part, k) => (k ? [<mark key={k} className="tr-flag">{s.flag}</mark>, part] : [part])) : s.text}</span>
+                        <span key={i}>{i > 0 && ' '}{rerec === i
+                          ? <span className="tr-rerec"><span className="meter">{[0, 1, 2].map((k) => <i key={k} style={{ animationDelay: `${k * 120}ms` }} />)}</span>Re-recording this part…</span>
+                          : <span className={pick ? 'tr-seg' : undefined} onClick={pick ? (e) => { e.stopPropagation(); doRerecord(i) } : undefined} role={pick ? 'button' : undefined}>
+                            {s.flag ? s.text.split(s.flag).flatMap((part, k) => (k ? [<mark key={k} className="tr-flag">{s.flag}</mark>, part] : [part])) : s.text}
+                          </span>}</span>
                       ))}
                       {rec === 'recording' && <span className="live-caret" />}
                     </p>

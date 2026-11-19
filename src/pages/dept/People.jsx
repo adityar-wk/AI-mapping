@@ -158,7 +158,8 @@ function CreateDialog({ onClose, onDone, sups, edit, person, role: r0 }) {
 }
 
 function DeactivateDialog({ p, role, sups, users, onClose, onDone }) {
-  const pending = role === 'supervisor' ? p.pending : p.drafts
+  // supervisors still hand over their users; a user's drafts simply stay on record
+  const pending = role === 'supervisor' ? p.pending : 0
   const [target, setTarget] = useState('')
   const needs = pending > 0
   return (
@@ -166,8 +167,8 @@ function DeactivateDialog({ p, role, sups, users, onClose, onDone }) {
       foot={<><button className="btn ghost" onClick={onClose}>Cancel</button><button className="btn danger solid" disabled={needs && !target} onClick={onDone}><UserX />Deactivate</button></>}>
       {needs ? (
         <>
-          <div className="notice warn"><Info /><span>{role === 'supervisor' ? <>{p.name} has <b>{pending} pending review{pending > 1 ? 's' : ''}</b> and {p.users} assigned users. Reassign them first.</> : <>{p.name} has <b>{pending} unfinished draft{pending > 1 ? 's' : ''}</b>. Transfer them to keep the work.</>}</span></div>
-          <div className="field"><label>{role === 'supervisor' ? 'Move reviews and users to' : 'Transfer drafts to'}</label>
+          <div className="notice warn"><Info /><span>{role === 'supervisor' ? <>{p.name} has <b>{pending} pending review{pending > 1 ? 's' : ''}</b> and {p.users} assigned users. Reassign them first.</> : null}</span></div>
+          <div className="field"><label>Move reviews and users to</label>
             <select className="select" value={target} onChange={(e) => setTarget(e.target.value)}>
               <option value="">Choose…</option>
               {(role === 'supervisor' ? sups : users).map((x) => <option key={x.id}>{x.name}</option>)}
@@ -175,7 +176,7 @@ function DeactivateDialog({ p, role, sups, users, onClose, onDone }) {
             <span className="hint">{role === 'supervisor' ? 'Existing feedback and history move with each submission. ' : ''}Only active people in this department are listed.</span>
           </div>
         </>
-      ) : <p className="ink2">Nothing is assigned to {p.name}. Approvals, revisions and ownership records will still show their name.</p>}
+      ) : <p className="ink2">{role === 'supervisor' ? `Nothing is assigned to ${p.name}.` : p.drafts ? `${p.name}’s ${p.drafts} unfinished draft${p.drafts > 1 ? 's stay' : ' stays'} on record.` : `${p.name} has no unfinished drafts.`} Approvals, revisions and ownership records will still show their name.</p>}
     </Modal>
   )
 }

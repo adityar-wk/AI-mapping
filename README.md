@@ -45,11 +45,10 @@ Soft SaaS style: very light grey canvas, off-white cards with 20px corners and s
 | Institute Admin | `/institute` | Institute overview |
 | Institute Admin | `/institute/departments` | Create, edit, archive, delete departments |
 | Institute Admin | `/institute/admins` | Assign or change Department Admins, reset password |
-| Institute Admin | `/institute/access` | Grant and revoke cross-department library access |
+| Institute Admin | `/institute/access` | Grant and revoke department-to-department library access |
 | Institute Admin | `/institute/suspensions` | Suspend and restore users |
 | Super Admin | `/platform` | Institutes: create, edit, activate, suspend, archive, Institute Admin |
 | Super Admin | `/platform/usage` | Users, processes, storage, AI usage by institute |
-| Super Admin | `/platform/settings` | Upload limit configuration |
 
 ## SOW coverage (§3.1–3.31)
 
@@ -75,12 +74,12 @@ Soft SaaS style: very light grey canvas, off-white cards with 20px corners and s
 | 3.18 | Create/edit user, assign/reassign supervisor, deactivate (transfer drafts), delete only without history | People → Users, Reporting structure |
 | 3.19 | Department overview/status, create (name, description), edit, delete restrictions, archive | Institute overview; Departments |
 | 3.20 | Assign Department Admin at creation, reset Department Admin password | Departments (create); Department admins |
-| 3.21 | Grant/revoke person- and department-level access, view-only, same institute | Library access |
+| 3.21 | Grant/revoke department-level access, view-only, same institute | Library access |
 | 3.22 | Suspend user, sessions revoked | User suspension; States |
 | 3.23 | Create institute with tenant ID, edit settings, activate/suspend, archive | Institutes + drawer |
 | 3.24 | Assign/change/remove Institute Admin | Institutes drawer |
 | 3.25 | User, process, storage and AI usage by institute (no billing) | Usage |
-| 3.26 | Configurable upload limits, formats fixed | Upload limits |
+| 3.26 | Upload limits applied to uploads (no settings screen) | Capture uploads |
 | 3.27–3.28 | Tenant isolation, session revocation | Tenant chip/IDs; States (suspended, session ended, access denied) |
 | 3.29 | Submission and review-outcome notifications, email + in-app, delivery failure | Notifications drawer |
 | 3.30 | In-app viewing; map export PDF/PNG; document export PDF/DOCX; version-specific export | Export dialog |

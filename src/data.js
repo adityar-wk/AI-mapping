@@ -31,9 +31,7 @@ export const CATEGORIES = ['Grants', 'Compliance', 'Student records', 'Finance',
 
 // status: draft | review | returned | approved
 export const PROCESSES = [
-  { id: 'p-104', name: 'Grant pre-award proposal routing', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['pre-award', 'routing', 'budget'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'draft', version: '3.0', approvedVersion: '2.1', updated: '2026-11-16T15:42:00', supervisor: 'Daniel Reyes',
-    // a step that relies on another process; access is checked against the target's library
-    links: [{ step: 'n8', process: 'p-056' }] },
+  { id: 'p-104', name: 'Grant pre-award proposal routing', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['pre-award', 'routing', 'budget'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'draft', version: '3.0', approvedVersion: '2.1', updated: '2026-11-16T15:42:00', supervisor: 'Daniel Reyes' },
   { id: 'p-118', name: 'Subaward agreement setup', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['subaward', 'contracts'], creator: 'Maria Okafor', owner: 'Grants Contract Officer', status: 'review', version: '1.0', approvedVersion: null, updated: '2026-11-14T10:05:00', supervisor: 'Daniel Reyes' },
   { id: 'p-097', name: 'Effort certification cycle', dept: 'Office of Sponsored Programs', category: 'Compliance', tags: ['effort', 'federal'], creator: 'Maria Okafor', owner: 'Compliance Analyst', status: 'returned', version: '1.0', approvedVersion: null, updated: '2026-11-12T09:30:00', supervisor: 'Daniel Reyes', feedback: 'The PI attestation step is missing the 30-day deadline and what happens when a PI does not respond. Please add the escalation path to the department chair.' },
   { id: 'p-082', name: 'No-cost extension request', dept: 'Office of Sponsored Programs', category: 'Grants', tags: ['post-award', 'extension'], creator: 'Maria Okafor', owner: 'Director, Sponsored Programs', status: 'approved', version: '1.2', approvedVersion: '1.2', updated: '2026-10-28T14:12:00', supervisor: 'Daniel Reyes' },
@@ -129,10 +127,8 @@ export const USERS = [
 ]
 
 export const GRANTS = [
-  { id: 'g1', kind: 'User', who: 'Maria Okafor', whoDept: 'Office of Sponsored Programs', target: 'Office of the Registrar', by: 'Thomas Healy', at: '2026-09-04' },
   { id: 'g2', kind: 'Department', who: 'Office of Sponsored Programs', target: 'Career Services', by: 'Thomas Healy', at: '2026-08-12' },
   { id: 'g3', kind: 'Department', who: 'Financial Aid', target: 'Office of the Registrar', by: 'Thomas Healy', at: '2026-05-20' },
-  { id: 'g4', kind: 'User', who: 'Jonah Pierce', whoDept: 'Career Services', target: 'Marketing & Communications', by: 'Thomas Healy', at: '2026-10-01' },
   { id: 'g5', kind: 'Department', who: 'Office of Sponsored Programs', target: 'Marketing & Communications', by: 'Thomas Healy', at: '2026-10-22' },
 ]
 
@@ -147,11 +143,6 @@ export const NOTIFICATIONS = {
   user: [
     { id: 1, kind: 'returned', title: 'Effort certification cycle was returned', body: 'Daniel Reyes: "The PI attestation step is missing the 30-day deadline…"', at: '2 days ago', to: '/process/p-097/edit', unread: true, channel: 'In-app · Email' },
     { id: 2, kind: 'approved', title: 'No-cost extension request approved as v1.2', body: 'Published to the Office of Sponsored Programs library.', at: 'Oct 28', to: '/process/p-082', unread: false, channel: 'In-app · Email' },
-  ],
-  deptAdmin: [
-    { id: 6, kind: 'attention', title: 'Nora Feld has no supervisor', body: 'Their submissions have no reviewer until you assign one.', at: '1 hour ago', to: '/dept/people?tab=structure', unread: true, channel: 'In-app' },
-    { id: 7, kind: 'people', title: 'Invitation to Grace Tran is still pending', body: 'Grace Tran hasn’t signed in yet. You can resend the invitation from Users & supervisors.', at: 'Yesterday', to: '/dept/people?tab=sups', unread: true, channel: 'In-app' },
-    { id: 8, kind: 'attention', title: 'Ian Whitaker left 1 unfinished draft', body: 'Transfer it to an active user so the work isn’t stranded.', at: 'Nov 12', to: '/dept/people', unread: false, channel: 'In-app' },
   ],
   supervisor: [
     { id: 3, kind: 'review', title: 'Award acceptance and account setup submitted', body: 'Hannah Cole submitted v1.0 for your review.', at: '4 hours ago', to: '/review/p-140', unread: true, channel: 'In-app · Email' },
