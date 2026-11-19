@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { GripVertical } from 'lucide-react'
 
 /*
   Swimlane map (SOW 3.7 / 3.8) — vertical lanes.
@@ -6,6 +7,7 @@ import { useRef } from 'react'
   - nodes placed by lane (column) + col (row, the step order) — auto layout
   - start / task / decision / parallel / end shapes, loop edges routed back up
   - drag-and-drop moves a node visually only (offsets), never the logic
+  - lanes can be reordered by dragging their header (IN-0109)
   - no zoom / pan / minimap: excluded by SOW 3.8 scope boundary
 */
 
@@ -109,7 +111,10 @@ function Shape({ n, p, selected, changed, editable, onDown }) {
   )
 }
 
-export default function Swimlane({ lanes, nodes, edges, offsets = {}, onMove, selected, onSelect, editable = false, changed = [], selectedEdge, onSelectEdge }) {
+export default function Swimlane({ lanes, nodes, edges, offsets = {}, onMove, selected, onSelect, editable = false, changed = [], selectedEdge, onSelectEdge, onReorderLanes }) {
+  const [dragLane, setDragLane] = useState(null)
+  const [overLane, setOverLane] = useState(null)
+  const laneDrag = editable && onReorderLanes
   const pos = layout(nodes, lanes, offsets)
   const maxRow = Math.max(...nodes.map((n) => n.col))
   const W = lanes.length * LANE_W
@@ -146,7 +151,16 @@ export default function Swimlane({ lanes, nodes, edges, offsets = {}, onMove, se
     {/* lane names stay pinned while the map scrolls down */}
     <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', height: HEAD_H, background: 'var(--paper)', borderBottom: '1px solid rgba(26,33,50,0.14)', borderRadius: '8px 8px 0 0' }}>
       {lanes.map((l, i) => (
-        <div key={l.id} style={{ width: LANE_W, flex: 'none', padding: '0 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 2, borderLeft: i ? '1px solid rgba(26,33,50,0.12)' : 0, boxSizing: 'border-box' }}>
+        <div key={l.id}
+          draggable={!!laneDrag}
+          onDragStart={laneDrag ? (e) => { setDragLane(i); e.dataTransfer.effectAllowed = 'move' } : undefined}
+          onDragOver={laneDrag ? (e) => { e.preventDefault(); setOverLane(i) } : undefined}
+          onDragLeave={laneDrag ? () => setOverLane((o) => (o === i ? null : o)) : undefined}
+          onDrop={laneDrag ? (e) => { e.preventDefault(); if (dragLane !== null && dragLane !== i) onReorderLanes(dragLane, i); setDragLane(null); setOverLane(null) } : undefined}
+          onDragEnd={laneDrag ? () => { setDragLane(null); setOverLane(null) } : undefined}
+          title={laneDrag ? 'Drag to reorder lanes' : undefined}
+          style={{ width: LANE_W, flex: 'none', padding: '0 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 2, borderLeft: i ? '1px solid rgba(26,33,50,0.12)' : 0, boxSizing: 'border-box', position: 'relative', cursor: laneDrag ? 'grab' : 'default', opacity: dragLane === i ? 0.45 : 1, background: overLane === i && dragLane !== i ? 'var(--navy-tint)' : undefined }}>
+          {laneDrag && <GripVertical size={13} style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-4)' }} />}
           <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>LANE {i + 1}</span>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.25 }}>{l.name}</span>
         </div>

@@ -25,7 +25,6 @@ import Access from './pages/inst/Access'
 import Suspensions from './pages/inst/Suspensions'
 import Institutes from './pages/platform/Institutes'
 import Usage from './pages/platform/Usage'
-import Settings from './pages/platform/Settings'
 import States from './pages/States'
 import ComponentLibrary from './pages/ComponentLibrary'
 
@@ -71,7 +70,6 @@ const NAV = {
     { label: 'Platform', items: [
       { to: '/platform', icon: Landmark, label: 'Institutes', end: true },
       { to: '/platform/usage', icon: BarChart3, label: 'Usage by institute' },
-      { to: '/platform/settings', icon: SlidersHorizontal, label: 'Upload limits' },
     ] },
   ],
 }
@@ -200,7 +198,6 @@ export default function App() {
             <Route path="/institute/suspensions" element={<Suspensions />} />
             <Route path="/platform" element={<Institutes />} />
             <Route path="/platform/usage" element={<Usage />} />
-            <Route path="/platform/settings" element={<Settings />} />
             <Route path="/states" element={<States />} />
             <Route path="/components" element={<ComponentLibrary />} />
             <Route path="*" element={<Navigate to="/" replace />} />

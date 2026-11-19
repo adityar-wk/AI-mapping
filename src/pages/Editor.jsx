@@ -21,6 +21,7 @@ export default function Editor({ mode }) {
   const proc = PROCESSES.find((p) => p.id === id) || PROCESSES[0]
   const author = review ? proc.creator : PERSONAS.user.name
 
+  const [lanes, setLanes] = useState(LANES)
   const [nodes, setNodes] = useState(NODES)
   const [edges, setEdges] = useState(EDGES)
   const [offsets, setOffsets] = useState({})
@@ -52,6 +53,8 @@ export default function Editor({ mode }) {
   const dirty = () => setSave('dirty')
   const mapEdit = () => { setSync('doc-stale'); dirty() }
 
+  // lane order is layout only, like dragging a step: the steps and their roles don't change
+  const reorderLanes = (from, to) => { setLanes((ls) => { const x = [...ls]; const [m] = x.splice(from, 1); x.splice(to, 0, m); return x }); dirty() }
   const onMove = (nid, o) => { setOffsets((x) => ({ ...x, [nid]: o })); dirty() } // layout only — no sync flag
   const relabel = (nid, label) => { setNodes((ns) => ns.map((n) => (n.id === nid ? { ...n, label } : n))); mapEdit() }
   const retype = (nid, type) => { setNodes((ns) => ns.map((n) => (n.id === nid ? { ...n, type } : n))); mapEdit() }
@@ -148,8 +151,8 @@ export default function Editor({ mode }) {
               {view === 'map' && <span className="small" style={{ fontWeight: 600, marginLeft: 6 }}>{doc.name} <span className="hint" style={{ fontWeight: 400 }}>· v{proc.version}</span></span>}
               <span className="grow" />
               {view !== 'doc' && <>
-                <span className="hint hide-narrow">Drag steps to rearrange — position doesn’t change the logic</span>
-                <button className="btn sm" onClick={() => { setOffsets({}); toast('Automatic layout applied') }}><LayoutGrid />Auto layout</button>
+                <span className="hint hide-narrow">Drag steps or lane headers to rearrange — position doesn’t change the logic</span>
+                <button className="btn sm" onClick={() => { setOffsets({}); setLanes(LANES); toast('Automatic layout applied') }}><LayoutGrid />Auto layout</button>
                 <button className={`btn sm ${panel === 'edit' ? 'primary' : ''}`} onClick={() => setPanel(panel === 'edit' ? 'ai' : 'edit')}><MousePointerClick />Edit map</button>
               </>}
               {review && <button className={`btn sm ${panel === 'sources' ? 'primary' : ''}`} onClick={() => setPanel(panel === 'sources' ? 'ai' : 'sources')}><Paperclip />Sources</button>}
@@ -170,7 +173,7 @@ export default function Editor({ mode }) {
                 <div className="map-wrap out-col">
                   <div style={{ padding: 16, paddingBottom: 220 }}>
                     <div style={{ border: '1px solid var(--rule)', borderRadius: 8, width: 'max-content', background: 'var(--sheet)', margin: view === 'map' ? '0 auto' : undefined }}>
-                      <Swimlane lanes={LANES} nodes={nodes} edges={edges} offsets={offsets} onMove={onMove} editable={!locked}
+                      <Swimlane lanes={lanes} onReorderLanes={reorderLanes} nodes={nodes} edges={edges} offsets={offsets} onMove={onMove} editable={!locked}
                         selected={sel} onSelect={(x) => { setSel(x); if (x) { setSelEdge(null); setPanel('edit') } }}
                         selectedEdge={selEdge} onSelectEdge={locked ? undefined : (x) => { setSelEdge(x); if (x) { setSel(null); setPanel('edit') } }}
                         changed={changed} />

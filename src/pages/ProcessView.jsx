@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Download, GitBranchPlus, PenLine, BadgeCheck, Lock, Eye, History, ShieldAlert, Paperclip, Workflow, FileText, Archive } from 'lucide-react'
+import { Download, GitBranchPlus, PenLine, BadgeCheck, Lock, Eye, History, Paperclip, Workflow, FileText, Archive } from 'lucide-react'
 import { Topbar, useRole } from '../App'
 import { PROCESSES, VERSIONS, LANES, NODES, EDGES, DOC, fmtDate, fmtDateTime, sourcesFor } from '../data'
 import { Rail, Seal, Tag, Avatar, FileIcon, Modal, useToast, LockedNote } from '../components/ui'
@@ -29,8 +29,6 @@ export default function ProcessView() {
   const crossView = !ownDept
   const underReview = p.status === 'review'
   const files = sourcesFor(p.id).files
-  // links to processes in a library this viewer can't open
-  const blockedLinks = (p.links || []).map((l) => ({ ...l, target: PROCESSES.find((x) => x.id === l.process), step: NODES.find((n) => n.id === l.step) })).filter((l) => l.target?.restricted)
   const sealStatus = underReview ? 'review' : isHistorical ? 'draft' : 'approved'
 
   return (
@@ -115,12 +113,6 @@ export default function ProcessView() {
             </div>
           </div>
 
-          {blockedLinks.length > 0 && (
-            <div className="notice" style={{ background: 'var(--sheet)' }}>
-              <ShieldAlert style={{ color: 'var(--ink-3)' }} />
-              <div className="stack gap1"><span className="small"><b>{blockedLinks.length} linked process{blockedLinks.length > 1 ? 'es are' : ' is'} restricted.</b> {blockedLinks.map((l) => `“${l.step?.label}” depends on a ${l.target.dept} process`).join('; ')} you don’t have access to.</span><span className="hint">Ask your Institute Admin for library access.</span></div>
-            </div>
-          )}
         </aside>
       </div>
 
