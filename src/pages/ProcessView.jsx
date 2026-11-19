@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Download, GitBranchPlus, PenLine, BadgeCheck, Lock, Eye, History, Paperclip, Workflow, FileText, Archive } from 'lucide-react'
+import { Download, GitBranchPlus, PenLine, BadgeCheck, Lock, Eye, History, Paperclip, Workflow, FileText, Archive, CornerUpLeft, MessageSquareText } from 'lucide-react'
 import { Topbar, useRole } from '../App'
 import { PROCESSES, VERSIONS, LANES, NODES, EDGES, DOC, fmtDate, fmtDateTime, sourcesFor } from '../data'
 import { Rail, Seal, Tag, Avatar, FileIcon, Modal, useToast, LockedNote } from '../components/ui'
 import Swimlane, { MapLegend } from '../components/Swimlane'
 import ProcessDoc, { deriveSteps } from '../components/ProcessDoc'
-import { ExportDialog } from '../components/dialogs'
+import { ExportDialog, ApproveDialog, ReturnDialog } from '../components/dialogs'
 
 export default function ProcessView() {
   const { id } = useParams()
@@ -38,6 +38,14 @@ export default function ProcessView() {
         {role === 'supervisor' && ownDept && p.status === 'approved' && (
           <button className="btn primary" onClick={() => setDlg('reopen')} disabled={!!activeDraft} title={activeDraft ? 'A draft is already open' : ''}><GitBranchPlus />Reopen as new draft</button>
         )}
+        {/* a process waiting for this supervisor can be decided from here, or reviewed in the workspace */}
+        {role === 'supervisor' && ownDept && underReview && (
+          <>
+            <button className="btn" onClick={() => nav(`/review/${p.id}`)}><MessageSquareText />Review with AI</button>
+            <button className="btn" onClick={() => setDlg('return')}><CornerUpLeft />Return</button>
+            <button className="btn primary" onClick={() => setDlg('approve')}><BadgeCheck />Approve</button>
+          </>
+        )}
         {role === 'user' && activeDraft && !underReview && <button className="btn primary" onClick={() => nav(`/process/${p.id}/edit`)}><PenLine />Continue draft v{activeDraft.v}</button>}
       </Topbar>
 
@@ -59,7 +67,9 @@ export default function ProcessView() {
       </div>
 
       {qs.get('approved') && <div className="lock-banner" style={{ background: 'var(--approved-wash)', color: '#1f4a35' }}><BadgeCheck />Approved and published. {p.creator} has been notified.</div>}
-      {underReview && <LockedNote>Under review by {p.supervisor}. You can view it, but editing is locked until the review is complete.</LockedNote>}
+      {underReview && (role === 'supervisor'
+        ? <LockedNote>Submitted by {p.creator} for your review. Approve or return it here, or open Review with AI to revise it first.</LockedNote>
+        : <LockedNote>Under review by {p.supervisor}. You can view it, but editing is locked until the review is complete.</LockedNote>)}
       {isHistorical && <div className="lock-banner" style={{ background: 'var(--well)', color: 'var(--ink-2)' }}><History />You’re viewing a historical version. v{approvedVs[0].v} is the current approved version.</div>}
       {activeDraft && !isHistorical && !underReview && <div className="lock-banner"><Lock />v{viewV} is locked. A draft (v{activeDraft.v}) is in progress and won’t replace this version until it’s approved.</div>}
       {crossView && <div className="lock-banner" style={{ background: 'var(--well)', color: 'var(--ink-2)' }}><Eye />View-only access to {p.dept}, granted by your Institute Admin.{p.archivedDept && ' This department is archived; its approved processes are preserved.'}</div>}
@@ -117,6 +127,10 @@ export default function ProcessView() {
       </div>
 
       {dlg === 'export' && <ExportDialog onClose={() => setDlg(null)} versions={approvedVs.map((v) => ({ id: v.v, label: `v${v.v} · ${v.state === 'current' ? 'approved (current)' : 'historical'}` }))} />}
+      {dlg === 'approve' && <ApproveDialog onClose={() => setDlg(null)} author={p.creator} version={p.version} dept={p.dept} suggestedTags={p.tags}
+        onDone={() => { setDlg(null); toast(`v${p.version} approved and published`); nav(`/process/${p.id}?approved=1`) }} />}
+      {dlg === 'return' && <ReturnDialog onClose={() => setDlg(null)} author={p.creator}
+        onDone={() => { setDlg(null); toast(`Returned to ${p.creator}`); nav('/reviews') }} />}
       {dlg === 'reopen' && (
         <Modal title="Reopen as a new draft?" sub={`v${p.version} stays approved, locked and published. Edits happen in v${(parseFloat(p.version) + 1).toFixed(1)}.`} onClose={() => setDlg(null)}
           foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" onClick={() => { setDlg(null); toast('Draft created'); nav(`/review/${p.id}`) }}><GitBranchPlus />Create draft</button></>}>
