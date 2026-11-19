@@ -6,10 +6,10 @@ import {
   ArrowUp, Square, X, Maximize2, Minimize2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { Topbar } from '../App'
-import { PROCESSES, LANES, NODES, EDGES, DOC, PERSONAS } from '../data'
+import { PROCESSES, LANES, NODES, EDGES, DOC, PERSONAS, VERSIONS, sourcesFor, fmtDateTime, fmtDuration } from '../data'
 import { Rail, Seal, Tag, FileIcon, useToast, LockedNote } from '../components/ui'
 import Swimlane, { MapLegend } from '../components/Swimlane'
-import ProcessDoc, { deriveSteps } from '../components/ProcessDoc'
+import ProcessDoc, { deriveSteps, FIELDS } from '../components/ProcessDoc'
 import { ExportDialog, SubmitDialog, ApproveDialog, ReturnDialog } from '../components/dialogs'
 
 export default function Editor({ mode }) {
@@ -31,11 +31,22 @@ export default function Editor({ mode }) {
   const [sel, setSel] = useState(null)
   const [selEdge, setSelEdge] = useState(null)
   const [view, setView] = useState('split')
-  const [panel, setPanel] = useState(review ? 'sources' : 'ai')
+  const [panel, setPanel] = useState('ai')
   const [save, setSave] = useState('saved') // saved | saving | dirty
   const [dialog, setDialog] = useState(null)
   const [full, setFull] = useState(false)
-  const thread = useAIThread(review)
+  const [savedAt, setSavedAt] = useState(proc.updated)
+  const src = sourcesFor(proc.id)
+  const confirmedFiles = src.files.filter((f) => f.confirmed).length
+  // every summary on this screen is counted from the current map and document
+  const stats = {
+    roles: new Set(nodes.map((n) => n.lane)).size,
+    steps: nodes.filter((n) => n.type === 'task').length,
+    decisions: nodes.filter((n) => n.type === 'decision').length,
+    fields: FIELDS.length, // includes the process name
+    described: FIELDS.filter(([k]) => doc[k] && String(doc[k]).trim()).length,
+  }
+  const thread = useAIThread(review, { nodes, stats })
   const [status, setStatus] = useState(proc.status === 'returned' ? 'returned' : review ? 'review' : 'draft')
 
   const dirty = () => setSave('dirty')
@@ -61,9 +72,10 @@ export default function Editor({ mode }) {
     dirty()
   }
 
-  const doSave = () => { setSave('saving'); setTimeout(() => setSave('saved'), 700) }
+  const doSave = () => { setSave('saving'); setTimeout(() => { setSave('saved'); setSavedAt(new Date().toISOString()) }, 700) }
   const locked = status === 'review' && !review
   const steps = docSteps
+  const floatOpen = (panel === 'edit' && view !== 'doc') || panel === 'sources'
   const inspector = (
     <Inspector nodes={nodes} edges={edges} sel={sel} selEdge={selEdge} setSel={setSel} setSelEdge={setSelEdge}
       relabel={relabel} retype={retype} setEdge={setEdge} delEdge={delEdge} addEdge={addEdge} />
@@ -76,7 +88,7 @@ export default function Editor({ mode }) {
   }, [full])
 
   const versions = [
-    { id: 'd', label: `v${proc.version} · ${review ? 'submitted' : 'draft'} · saved Nov 16, 3:42 PM` },
+    { id: 'd', label: `v${proc.version} · ${review ? 'submitted' : 'draft'} · saved ${fmtDateTime(savedAt)}` },
     ...(proc.approvedVersion ? [{ id: 'a', label: `v${proc.approvedVersion} · approved (current)` }] : []),
   ]
 
@@ -85,7 +97,7 @@ export default function Editor({ mode }) {
       <Topbar wide crumbs={review
         ? [{ label: 'Review queue', to: '/reviews' }, { label: proc.name }]
         : [{ label: 'My processes', to: '/home' }, { label: proc.name }]}>
-        <SaveState s={save} />
+        <SaveState s={save} at={savedAt} />
         <button className="btn" onClick={() => setDialog('export')}><Download />Export</button>
         {!review && (
           <>
@@ -115,34 +127,16 @@ export default function Editor({ mode }) {
         )}
 
         {!full && qs.get('generated') && !review && (
-          <div className="lock-banner" style={{ background: 'var(--approved-wash)', color: '#1f4a35' }}><Sparkles />Generated from your conversation and 2 confirmed documents. Check both the map and the document before submitting.</div>
+          <div className="lock-banner" style={{ background: 'var(--approved-wash)', color: '#1f4a35' }}><Sparkles />Generated from your conversation{confirmedFiles > 0 && ` and ${confirmedFiles} confirmed document${confirmedFiles > 1 ? 's' : ''}`}. Check both the map and the document before submitting.</div>
         )}
-        {!full && status === 'returned' && !review && (
+        {!full && status === 'returned' && !review && proc.feedback && (
           <div className="lock-banner" style={{ background: 'var(--returned-wash)', color: '#5d430f' }}><CornerUpLeft />
-            <span><b>Returned by {proc.supervisor}:</b> {proc.feedback || 'Please add the escalation path.'}</span>
+            <span><b>Returned by {proc.supervisor}:</b> {proc.feedback}</span>
           </div>
         )}
         {!full && review && <LockedNote>Locked for {proc.creator} while you review. Your revisions apply directly — you don’t have to return it to make changes.</LockedNote>}
 
         <div className={`editor-ws view-${view}`}>
-          {/* ── side panel (document and split views) ── */}
-          {view !== 'map' && (
-            <aside className="pane" style={{ background: 'var(--paper)' }}>
-              <div className="pane-head" style={{ padding: '0 16px' }}>
-                <div className="tabs" style={{ borderBottom: 0, gap: 16 }}>
-                  <button className={panel === 'ai' ? 'on' : ''} onClick={() => setPanel('ai')}><Sparkles size={14} />{review ? 'Review with AI' : 'Revise with AI'}</button>
-                  <button className={panel === 'edit' ? 'on' : ''} onClick={() => setPanel('edit')}><MousePointerClick size={14} />Edit map</button>
-                  {review && <button className={panel === 'sources' ? 'on' : ''} onClick={() => setPanel('sources')}><Paperclip size={14} />Sources</button>}
-                </div>
-              </div>
-              <div className="pane-body" style={panel === 'ai' ? { overflow: 'hidden', display: 'flex', flexDirection: 'column' } : undefined}>
-                {panel === 'ai' && <AIPanel review={review} thread={thread} onApply={applyAI} />}
-                {panel === 'edit' && inspector}
-                {panel === 'sources' && <SourcesPanel />}
-              </div>
-            </aside>
-          )}
-
           {/* ── outputs ── */}
           <section className="pane outputs" style={{ minWidth: 0 }}>
             <div className="map-toolbar">
@@ -156,10 +150,10 @@ export default function Editor({ mode }) {
               {view !== 'doc' && <>
                 <span className="hint hide-narrow">Drag steps to rearrange — position doesn’t change the logic</span>
                 <button className="btn sm" onClick={() => { setOffsets({}); toast('Automatic layout applied') }}><LayoutGrid />Auto layout</button>
-              </>}
-              {view === 'map' && <>
                 <button className={`btn sm ${panel === 'edit' ? 'primary' : ''}`} onClick={() => setPanel(panel === 'edit' ? 'ai' : 'edit')}><MousePointerClick />Edit map</button>
-                {review && <button className={`btn sm ${panel === 'sources' ? 'primary' : ''}`} onClick={() => setPanel(panel === 'sources' ? 'ai' : 'sources')}><Paperclip />Sources</button>}
+              </>}
+              {review && <button className={`btn sm ${panel === 'sources' ? 'primary' : ''}`} onClick={() => setPanel(panel === 'sources' ? 'ai' : 'sources')}><Paperclip />Sources</button>}
+              {view === 'map' && <>
                 <button className="btn sm icon" onClick={() => setFull((f) => !f)} aria-label={full ? 'Exit full screen' : 'Full screen'} title={full ? 'Exit full screen' : 'Full screen'}>{full ? <Minimize2 /> : <Maximize2 />}</button>
               </>}
             </div>
@@ -171,10 +165,10 @@ export default function Editor({ mode }) {
               <div className="syncbar"><AlertTriangle /><span className="grow"><b>The document was edited.</b> The map may not reflect it yet.</span><button className="btn sm" onClick={updateMap}><RefreshCw />Update map</button></div>
             )}
 
-            <div className={`outputs-body ${view === 'map' && (panel === 'edit' || panel === 'sources') ? 'has-float' : ''}`}>
+            <div className={`outputs-body ${floatOpen ? 'has-float' : ''}`}>
               {view !== 'doc' && (
                 <div className="map-wrap out-col">
-                  <div style={{ padding: 16, paddingBottom: view === 'map' ? 220 : 16 }}>
+                  <div style={{ padding: 16, paddingBottom: 220 }}>
                     <div style={{ border: '1px solid var(--rule)', borderRadius: 8, width: 'max-content', background: 'var(--sheet)', margin: view === 'map' ? '0 auto' : undefined }}>
                       <Swimlane lanes={LANES} nodes={nodes} edges={edges} offsets={offsets} onMove={onMove} editable={!locked}
                         selected={sel} onSelect={(x) => { setSel(x); if (x) { setSelEdge(null); setPanel('edit') } }}
@@ -187,19 +181,21 @@ export default function Editor({ mode }) {
               )}
               {view !== 'map' && (
                 <div className="out-col" style={{ background: 'var(--sheet)' }}>
-                  <ProcessDoc doc={doc} steps={steps} editable={!locked} onEditField={editField} changed={changed} version={proc.version} status={status === 'returned' ? 'returned' : status === 'review' ? 'under review' : 'draft'} />
+                  <div style={{ paddingBottom: 200 }}>
+                    <ProcessDoc doc={doc} steps={steps} editable={!locked} onEditField={editField} changed={changed} version={proc.version} status={status === 'returned' ? 'returned' : status === 'review' ? 'under review' : 'draft'} />
+                  </div>
                 </div>
               )}
 
-              {/* map view: AI composer floats over the canvas, always on screen */}
-              {view === 'map' && <AIPanel dock review={review} thread={thread} onApply={applyAI} />}
-              {view === 'map' && (panel === 'edit' || panel === 'sources') && (
+              {/* AI composer floats at the bottom in every view, always on screen */}
+              <AIPanel dock review={review} thread={thread} onApply={applyAI} />
+              {floatOpen && (
                 <div className="float-panel">
                   <div className="float-panel-head">
                     <span className="small" style={{ fontWeight: 600 }}>{panel === 'edit' ? 'Edit map' : 'Sources'}</span>
                     <button className="btn ghost sm icon" aria-label="Close" onClick={() => { setPanel('ai'); setSel(null); setSelEdge(null) }}><X /></button>
                   </div>
-                  <div className="float-panel-body">{panel === 'edit' ? inspector : <SourcesPanel />}</div>
+                  <div className="float-panel-body">{panel === 'edit' ? inspector : <SourcesPanel src={src} />}</div>
                 </div>
               )}
             </div>
@@ -207,10 +203,11 @@ export default function Editor({ mode }) {
         </div>
       </div>
 
-      {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} unsaved={save === 'dirty'} versions={versions} />}
-      {dialog === 'submit' && <SubmitDialog onClose={() => setDialog(null)} supervisor={proc.supervisor} version={proc.version} openQuestions={doc.exceptions ? 0 : 1}
+      {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} unsaved={save === 'dirty'} savedAt={savedAt} versions={versions} />}
+      {dialog === 'submit' && <SubmitDialog onClose={() => setDialog(null)} supervisor={proc.supervisor} version={proc.version} stats={stats} files={src.files}
         onDone={() => { setDialog(null); setStatus('review'); toast(`Submitted to ${proc.supervisor}`); nav('/home') }} />}
       {dialog === 'approve' && <ApproveDialog onClose={() => setDialog(null)} author={proc.creator} version={proc.version} dept={proc.dept} blocked={!!sync}
+        suggestedTags={proc.tags} reopenReason={proc.id === 'p-104' ? VERSIONS.find((v) => v.state === 'draft')?.summary : undefined}
         onDone={() => { setDialog(null); toast(`v${proc.version} approved and published`); nav(`/process/${proc.id}?approved=1`) }} />}
       {dialog === 'return' && <ReturnDialog onClose={() => setDialog(null)} author={proc.creator}
         onDone={() => { setDialog(null); toast(`Returned to ${proc.creator}`); nav('/reviews') }} />}
@@ -218,20 +215,24 @@ export default function Editor({ mode }) {
   )
 }
 
-function SaveState({ s }) {
+function SaveState({ s, at }) {
   if (s === 'saving') return <span className="save"><Loader2 className="spin" />Saving…</span>
   if (s === 'dirty') return <span className="save warn"><AlertTriangle />Unsaved changes</span>
-  return <span className="save"><CheckCircle2 />Saved · Nov 16, 3:42 PM</span>
+  return <span className="save"><CheckCircle2 />Saved · {fmtDateTime(at)}</span>
 }
 
 /* ── AI revision (voice or text), applied to both outputs ── */
 const SPOKEN = 'Rename dean sign-off to dean approval in Cayuse and add what happens if the portal rejects it'
 
-function useAIThread(review) {
-  const [msgs, setMsgs] = useState(review ? [
-    { who: 'ai', text: 'This submission has 14 steps across 4 roles. Tell me what to change — by voice or text — and I’ll update the map and document together.' },
-  ] : [
-    { who: 'ai', text: 'Ask for a change in plain language, for example “Move the dean sign-off before the chair review” or “Add what happens if the portal rejects the submission”.' },
+/*
+  In production the request goes to the model with the current map and document, and it returns a
+  structured proposal. In this build the proposal is matched from the request text, so it only ever
+  proposes changes the person actually asked for — and asks when it can't tell what they mean.
+*/
+function useAIThread(review, { nodes, stats }) {
+  const [msgs, setMsgs] = useState(() => [review
+    ? { who: 'ai', text: `This submission has ${stats.steps} steps and ${stats.decisions} decisions across ${stats.roles} roles, with ${stats.described} of ${stats.fields} document fields described. Tell me what to change — by voice or text — and I’ll update the map and document together.` }
+    : { who: 'ai', text: 'Ask for a change in plain language, for example “Move the dean sign-off before the chair review” or “Add what happens if the portal rejects the submission”.' },
   ])
   const [pending, setPending] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -241,11 +242,19 @@ function useAIThread(review) {
     setBusy(true)
     setTimeout(() => {
       setBusy(false)
-      setPending({
-        summary: 'Rename the Dean step and add a portal-rejection exception.',
-        node: { id: 'n12', from: 'Dean sign-off', label: 'Dean approval in Cayuse' },
-        field: { k: 'exceptions', v: 'If the sponsor portal rejects the submission, the SPO corrects the errors and resubmits before the deadline; if the deadline passes, the PI is notified.' },
-      })
+      const dean = nodes.find((n) => /dean/i.test(n.label))
+      const wantsRename = dean && /dean/i.test(t) && /(rename|call it|approval|change .*name)/i.test(t)
+      const wantsPortal = /(portal|reject)/i.test(t)
+      if (!wantsRename && !wantsPortal) {
+        setMsgs((m) => [...m, { who: 'ai', text: 'I couldn’t match that to a step or a document field yet. Which step should change (for example “Dean sign-off”), or which field — exceptions, systems, permissions?' }])
+        return
+      }
+      const parts = []
+      const rev = {}
+      if (wantsRename) { rev.node = { id: dean.id, from: dean.label, label: 'Dean approval in Cayuse' }; parts.push(`rename “${dean.label}” to “Dean approval in Cayuse”`) }
+      if (wantsPortal) { rev.field = { k: 'exceptions', v: 'If the sponsor portal rejects the submission, the SPO corrects the errors and resubmits before the deadline; if the deadline passes, the PI is notified.' }; parts.push('add a portal-rejection exception') }
+      rev.summary = parts.join(' and ').replace(/^./, (c) => c.toUpperCase()) + '.'
+      setPending(rev)
     }, 1000)
   }
   return { msgs, setMsgs, pending, setPending, busy, ask }
@@ -281,8 +290,8 @@ function AIPanel({ review, thread, onApply, dock }) {
           <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p className="small">{pending.summary}</p>
             <div className="stack gap2 small">
-              <span className="row gap2"><Workflow size={14} color="var(--ink-3)" /><span className="muted" style={{ textDecoration: 'line-through' }}>{pending.node.from}</span><ArrowRight size={12} /><b style={{ fontWeight: 500 }}>{pending.node.label}</b></span>
-              <span className="row gap2" style={{ alignItems: 'flex-start' }}><FileText size={14} color="var(--ink-3)" style={{ marginTop: 2 }} /><span>Exceptions: <span className="ink2">{pending.field.v}</span></span></span>
+              {pending.node && <span className="row gap2"><Workflow size={14} color="var(--ink-3)" /><span className="muted" style={{ textDecoration: 'line-through' }}>{pending.node.from}</span><ArrowRight size={12} /><b style={{ fontWeight: 500 }}>{pending.node.label}</b></span>}
+              {pending.field && <span className="row gap2" style={{ alignItems: 'flex-start' }}><FileText size={14} color="var(--ink-3)" style={{ marginTop: 2 }} /><span>Exceptions: <span className="ink2">{pending.field.v}</span></span></span>}
             </div>
             <div className="row gap2">
               <button className="btn sm primary" onClick={() => { onApply(pending); setPending(null); setMsgs((m) => [...m, { who: 'ai', text: 'Applied to the map and the document. Changed items are marked.' }]) }}>Apply to map & document</button>
@@ -437,29 +446,34 @@ function Inspector({ nodes, edges, sel, selEdge, setSel, setSelEdge, relabel, re
   )
 }
 
-function SourcesPanel() {
+function SourcesPanel({ src }) {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="stack gap2">
         <span className="eyebrow">Original documents</span>
-        {[['OSP_PreAward_Procedures_2025.pdf', 'pdf', '38 pages'], ['Routing_checklist.xlsx', 'xls', '2 sheets']].map(([n, e, m]) => (
-          <div key={n} className="file"><FileIcon ext={e} /><div className="stack" style={{ gap: 2, minWidth: 0 }}><span className="small" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n}</span><span className="hint">{m}</span></div><button className="btn ghost sm icon" aria-label="Open"><Eye /></button></div>
+        {src.files.length === 0 && <span className="hint">No documents were uploaded.</span>}
+        {src.files.map((f) => (
+          <div key={f.name} className="file"><FileIcon ext={f.ext} /><div className="stack" style={{ gap: 2, minWidth: 0 }}><span className="small" style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span><span className="hint">{f.meta}</span></div><button className="btn ghost sm icon" aria-label="Open"><Eye /></button></div>
         ))}
       </div>
-      <div className="stack gap2">
-        <span className="eyebrow">Extracted information used</span>
-        <div className="card">
-          {[['§ 4.2 Eligibility review', 'Confirmed as extracted'], ['§ 4.3 Routing timeline', 'Corrected by author: “5 business days”'], ['§ 4.4 Compliance forms', 'Corrected by author: “Cayuse SP”, “IRB protocol numbers”'], ['Dean threshold conflict', 'Author chose: document ($250k threshold)'], ['Page 14', 'Unreadable — excluded']].map(([a, b], i) => (
-            <div key={a} className="list-row" style={{ padding: '9px 12px', alignItems: 'flex-start' }}>
-              <div className="stack" style={{ gap: 1 }}><span className="small" style={{ fontWeight: 500 }}>{a}</span><span className="hint" style={{ color: i === 4 ? 'var(--returned)' : undefined }}>{b}</span></div>
-            </div>
-          ))}
+      {src.decisions.length > 0 && (
+        <div className="stack gap2">
+          <span className="eyebrow">Extracted information used</span>
+          <div className="card">
+            {src.decisions.map((d) => (
+              <div key={d.item} className="list-row" style={{ padding: '9px 12px', alignItems: 'flex-start' }}>
+                <div className="stack" style={{ gap: 1 }}><span className="small" style={{ fontWeight: 500 }}>{d.item}</span><span className="hint" style={{ color: d.warn ? 'var(--returned)' : undefined }}>{d.outcome}</span></div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="stack gap2">
-        <span className="eyebrow">Capture conversation</span>
-        <div className="card card-pad small ink2" style={{ padding: 12 }}>12 messages · 4 min 20 s of transcribed voice. <a href="#t">Read transcript</a></div>
-      </div>
+      )}
+      {src.capture && (
+        <div className="stack gap2">
+          <span className="eyebrow">Capture conversation</span>
+          <div className="card card-pad small ink2" style={{ padding: 12 }}>{src.capture.messages} messages · {fmtDuration(src.capture.voiceSeconds)} of transcribed voice. <a href="#t">Read transcript</a></div>
+        </div>
+      )}
     </div>
   )
 }

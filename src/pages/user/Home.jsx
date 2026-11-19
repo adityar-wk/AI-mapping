@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, CornerUpLeft } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 import { Topbar } from '../../App'
-import { PROCESSES, PERSONAS, fmtDate } from '../../data'
-import { Tag } from '../../components/ui'
+import { PROCESSES, PERSONAS, fmtDate, greeting } from '../../data'
 import ProcessCard from '../../components/ProcessCard'
 
 const me = PERSONAS.user
@@ -13,7 +12,8 @@ export default function Home() {
   const [f, setF] = useState('all')
   const mine = PROCESSES.filter((p) => p.creator === me.name)
   const rows = f === 'all' ? mine : mine.filter((p) => p.status === f)
-  const returned = mine.find((p) => p.status === 'returned')
+  // every returned process gets a row; the comment is the supervisor's own words, recorded on Return
+  const returned = mine.filter((p) => p.status === 'returned')
   const open = (p) => nav(p.status === 'draft' || p.status === 'returned' ? `/process/${p.id}/edit` : `/process/${p.id}`)
   const count = (s) => mine.filter((p) => p.status === s).length
 
@@ -25,20 +25,26 @@ export default function Home() {
       <div className="page">
         <div className="page-head">
           <div>
-            <p className="lede">Good afternoon, Maria. Your submissions go to {me.supervisor} for review.</p>
+            <p className="lede">{greeting()}, {me.name.split(' ')[0]}. Your submissions go to {me.supervisor} for review.</p>
           </div>
         </div>
 
-        {returned && (
-          <div className="card row" style={{ padding: 20, gap: 16, alignItems: 'flex-start' }}>
-            <span className="tile amber"><CornerUpLeft /></span>
-            <div className="stack grow gap1">
-              <span className="row gap2"><span className="tag returned">Returned</span><span className="hint">{fmtDate(returned.updated)} · {returned.supervisor}</span></span>
-              <span style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>{returned.name}</span>
-              <p className="ink2">“{returned.feedback}”</p>
-            </div>
-            <button className="btn" onClick={() => nav(`/process/${returned.id}/edit`)}>Correct and resubmit</button>
-          </div>
+        {returned.length > 0 && (
+          <section className="card attn" aria-label="Returned to you">
+            <div className="attn-head"><span className="tag returned">Returned</span><span className="hint">{returned.length} to correct</span></div>
+            {returned.map((p) => (
+              <button key={p.id} className="attn-row" onClick={() => nav(`/process/${p.id}/edit`)}>
+                <div className="stack grow" style={{ gap: 2, minWidth: 0 }}>
+                  <span className="row gap2" style={{ minWidth: 0 }}>
+                    <b className="attn-name">{p.name}</b>
+                    <span className="hint" style={{ flex: 'none' }}>{p.supervisor} · {fmtDate(p.updated)}</span>
+                  </span>
+                  {p.feedback && <span className="attn-note">“{p.feedback}”</span>}
+                </div>
+                <span className="attn-go">Correct<ChevronRight size={14} /></span>
+              </button>
+            ))}
+          </section>
         )}
 
         <div className="row spread wrap gap2">

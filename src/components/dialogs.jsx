@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Download, AlertTriangle, Loader2, Check, Lock, Send, BadgeCheck, CornerUpLeft, Mail, Bell, Workflow, FileText } from 'lucide-react'
 import { Modal, useToast } from './ui'
+import { fmtTime } from '../data'
 
-export function ExportDialog({ onClose, unsaved, versions }) {
+export function ExportDialog({ onClose, unsaved, savedAt, versions }) {
   const toast = useToast()
   const [map, setMap] = useState({ pdf: true, png: false })
   const [doc, setDoc] = useState({ pdf: true, docx: false })
@@ -24,7 +25,7 @@ export function ExportDialog({ onClose, unsaved, versions }) {
       </>}>
       {unsaved && (
         <div className="notice warn"><AlertTriangle />
-          <div className="stack gap2"><span><b>You have unsaved changes.</b> Export uses the last saved version (saved 3:42 PM). Unsaved edits won’t be included.</span>
+          <div className="stack gap2"><span><b>You have unsaved changes.</b> Export uses the last saved version{savedAt && ` (saved ${fmtTime(savedAt)})`}. Unsaved edits won’t be included.</span>
             <div><button className="btn sm">Save first, then export</button></div></div>
         </div>
       )}
@@ -59,34 +60,57 @@ function useOnce(fn) {
   return [busy, () => { if (busy) return; setBusy(true); setTimeout(fn, 900) }]
 }
 
-export function SubmitDialog({ onClose, onDone, supervisor, openQuestions = 0, version }) {
+export function SubmitDialog({ onClose, onDone, supervisor, version, stats, files = [] }) {
+  const missing = stats.fields - stats.described
+  const unconfirmed = files.filter((f) => !f.confirmed).length
   const [busy, run] = useOnce(onDone)
   return (
     <Modal title="Submit for review" sub={`v${version} of the map and document go to your supervisor together.`} onClose={onClose}
       foot={<><button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button><button className="btn primary" disabled={busy} onClick={run}>{busy ? <><Loader2 className="spin" />Submitting…</> : <><Send />Submit to {supervisor}</>}</button></>}>
       <div className="card">
-        {[['Swimlane map', '14 steps across 4 roles'], ['Written document', '12 of 12 fields described'], ['Source documents', '2 attached · extracted content confirmed']].map(([a, b]) => (
-          <div key={a} className="list-row" style={{ padding: '10px 14px' }}><Check size={15} color="var(--approved)" /><span className="grow">{a}</span><span className="hint">{b}</span></div>
+        {[
+          ['Swimlane map', `${stats.steps} steps · ${stats.decisions} decisions · ${stats.roles} roles`, true],
+          ['Written document', `${stats.described} of ${stats.fields} fields described`, missing === 0],
+          ['Source documents', files.length ? `${files.length} attached · ${unconfirmed ? `${unconfirmed} not confirmed` : 'extracted content confirmed'}` : 'None attached', !unconfirmed],
+        ].map(([a, b, ok]) => (
+          <div key={a} className="list-row" style={{ padding: '10px 14px' }}>{ok ? <Check size={15} color="var(--approved)" /> : <AlertTriangle size={15} color="var(--returned)" />}<span className="grow">{a}</span><span className="hint">{b}</span></div>
         ))}
       </div>
-      {openQuestions > 0 && <div className="notice warn"><AlertTriangle /><span>{openQuestions} question is still open. Your supervisor will see it as not yet described.</span></div>}
+      {missing > 0 && <div className="notice warn"><AlertTriangle /><span>{missing} field{missing > 1 ? 's are' : ' is'} not yet described. Your supervisor will see {missing > 1 ? 'them' : 'it'} marked as not yet described.</span></div>}
       <div className="notice info"><Lock /><span>While it’s under review you can view the process but not edit it. {supervisor} is notified by email and in the app.</span></div>
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </Modal>
   )
 }
 
-export function ApproveDialog({ onClose, onDone, author, version, dept, blocked }) {
+export function ApproveDialog({ onClose, onDone, author, version, dept, blocked, suggestedTags = [], reopenReason }) {
   const [busy, run] = useOnce(onDone)
   const [note, setNote] = useState('')
+  const [tags, setTags] = useState(suggestedTags)
+  const [tagDraft, setTagDraft] = useState('')
+  const [summary, setSummary] = useState(reopenReason || '')
+  const addTag = () => { const t = tagDraft.trim().toLowerCase().replace(/^#/, ''); if (t && !tags.includes(t)) setTags([...tags, t]); setTagDraft('') }
   return (
     <Modal title={`Approve v${version}`} sub="The map and document are approved together as one locked version." onClose={onClose}
-      foot={<><button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button><button className="btn primary" disabled={busy || blocked} onClick={run}>{busy ? <><Loader2 className="spin" />Approving…</> : <><BadgeCheck />Approve and publish</>}</button></>}>
+      foot={<><button className="btn ghost" onClick={onClose} disabled={busy}>Cancel</button><button className="btn primary" disabled={busy || blocked || !summary.trim()} onClick={run}>{busy ? <><Loader2 className="spin" />Approving…</> : <><BadgeCheck />Approve and publish</>}</button></>}>
       {blocked && <div className="notice err"><AlertTriangle /><span><b>The map and document don’t match.</b> Update the document from the map before approving. Mismatched pairs can’t be approved.</span></div>}
       <div className="stack gap2 small ink2">
         <span className="row gap2"><Lock size={14} />v{version} becomes read-only. Future changes start a new draft.</span>
         <span className="row gap2"><BadgeCheck size={14} />Published to the {dept} library for permitted viewers.</span>
         <span className="row gap2"><Mail size={14} />{author} is notified by email and in the app, with your note.</span>
+      </div>
+      <div className="field">
+        <label>Version summary</label>
+        <textarea className="textarea" rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What changed in this version — shown in version history" />
+        <span className="hint">{reopenReason ? 'Starts from the reason given when this draft was reopened. Edit it to say what actually changed.' : 'Required. Shown in version history for everyone who can view this process.'}</span>
+      </div>
+      <div className="field">
+        <label>Catalog tags</label>
+        <div className="row wrap gap1">
+          {tags.map((t) => <span key={t} className="chip">#{t}<button className="chip-x" aria-label={`Remove ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}>×</button></span>)}
+          <input className="input" style={{ width: 140, height: 28 }} value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} placeholder="Add tag" aria-label="Add tag" />
+        </div>
+        <span className="hint">Suggested by AI from the map and document. You confirm them — they’re used for library search.</span>
       </div>
       <div className="field"><label>Note to {author} <span className="hint">(optional)</span></label><textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Thanks — I clarified the Dean threshold before approving." /></div>
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
