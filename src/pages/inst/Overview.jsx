@@ -1,29 +1,39 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, MoreHorizontal, PenLine, Archive, Trash2, Ban, ShieldCheck, Search, UserCog } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, MoreHorizontal, PenLine, Archive, Ban, Search, UserPlus, Replace } from 'lucide-react'
 import { Topbar } from '../../App'
-import { DEPARTMENTS, GRANTS, INSTITUTE } from '../../data'
+import { GRANTS, INSTITUTE } from '../../data'
 import { Tag, Dropdown, Modal, FilterButton, useToast } from '../../components/ui'
+import { adminName } from '../../components/AdminForm'
+import { useInstitute, inst, adminsOf } from './store'
+import ChangeAdmin from './ChangeAdmin'
 
-export const deptTag = (s) => <Tag kind={s === 'Active' ? 'approved' : s === 'Archived' ? 'draft' : 'returned'}>{s}</Tag>
+export const deptTag = (s) => <Tag kind={s === 'Active' ? 'approved' : 'draft'}>{s}</Tag>
 
-const STATUSES = ['All', 'Active', 'Setup pending', 'Archived']
+const STATUSES = ['All', 'Active', 'Archived']
 
-/* Institute Admin home: KPIs + the one departments table, with every action inline */
+/* Institute Admin home: KPIs + the departments table.
+   A department is only a name + description (POST /departments). Its admins are separate users,
+   created on the Department admins page (POST /departments/:id/admins); this page only shows them. */
 export default function InstOverview() {
   const [qs] = useSearchParams()
   const toast = useToast()
+  const nav = useNavigate()
+  const { departments, admins } = useInstitute()
   const [dlg, setDlg] = useState(qs.get('new') ? { kind: 'create' } : null)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('All')
   const [admin, setAdmin] = useState('any')
 
-  const sum = (k) => DEPARTMENTS.reduce((a, d) => a + d[k], 0)
-  const count = (s) => (s === 'All' ? DEPARTMENTS.length : DEPARTMENTS.filter((d) => d.status === s).length)
-  const rows = DEPARTMENTS.filter((d) =>
+  const names = (d) => adminsOf(admins, d.id).map(adminName)
+  const sum = (k) => departments.reduce((a, d) => a + d[k], 0)
+  const count = (s) => (s === 'All' ? departments.length : departments.filter((d) => d.status === s).length)
+  const noAdminCount = departments.filter((d) => d.status === 'Active' && names(d).length === 0).length
+  const rows = departments.filter((d) =>
     (status === 'All' || d.status === status) &&
-    (admin === 'any' || (admin === 'none') === (d.admin === '—')) &&
-    (!q || `${d.name} ${d.desc} ${d.admin}`.toLowerCase().includes(q.toLowerCase())))
+    (admin === 'any' || (admin === 'none') === (names(d).length === 0)) &&
+    (!q || `${d.name} ${d.desc} ${names(d).join(' ')}`.toLowerCase().includes(q.toLowerCase())))
 
   return (
     <>
@@ -34,7 +44,7 @@ export default function InstOverview() {
         <p className="lede muted">Departments, people and library access across your institute · tenant <span className="mono">{INSTITUTE.tenant}</span></p>
 
         <div className="ledger">
-          <div><span className="eyebrow">Departments</span><span className="big">{DEPARTMENTS.length}</span><span className="sub">{count('Active')} active · {count('Setup pending')} setup pending · {count('Archived')} archived</span></div>
+          <div><span className="eyebrow">Departments</span><span className="big">{departments.length}</span><span className="sub">{count('Active')} active · {count('Archived')} archived{noAdminCount ? ` · ${noAdminCount} without an admin` : ''}</span></div>
           <div><span className="eyebrow">People</span><span className="big">{sum('users') + sum('supervisors')}</span><span className="sub">{sum('users')} users · {sum('supervisors')} supervisors</span></div>
           <div><span className="eyebrow">Processes</span><span className="big">{sum('processes')}</span><span className="sub">across all departments</span></div>
           <div><span className="eyebrow">Library grants</span><span className="big">{GRANTS.length}</span><span className="sub">cross-department, view-only</span></div>
@@ -52,7 +62,7 @@ export default function InstOverview() {
               values={{ status, admin }}
               onChange={(k, v) => (k === 'status' ? setStatus(v) : setAdmin(v))}
               onClear={() => { setStatus('All'); setAdmin('any') }} />
-            <span className="hint num" style={{ marginLeft: 'auto' }}>{rows.length} of {DEPARTMENTS.length} departments</span>
+            <span className="hint num" style={{ marginLeft: 'auto' }}>{rows.length} of {departments.length} departments</span>
           </div>
 
           <div className="card">
@@ -61,14 +71,15 @@ export default function InstOverview() {
               <tbody>
                 {rows.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 32 }}>No departments match these filters.</td></tr>}
                 {rows.map((d) => {
-                  const people = d.users + d.supervisors
-                  const deps = people + d.processes
-                  const noAdmin = d.admin === '—'
+                  const who = names(d)
                   return (
                     <tr key={d.id}>
                       <td><div className="stack" style={{ gap: 2 }}><span className="t-title">{d.name}</span><span className="hint">{d.desc}</span></div></td>
                       <td>
-                        {noAdmin ? <span className="muted">Not assigned</span> : d.admin}
+                        {who.length ? who.join(', ')
+                          : d.status === 'Active'
+                            ? <Link className="row gap1 small" style={{ gap: 4 }} to={`/institute/admins?new=${d.id}`}><UserPlus size={14} />Add admin</Link>
+                            : <span className="muted">—</span>}
                       </td>
                       <td className="num">{d.users}</td>
                       <td className="num">{d.supervisors}</td>
@@ -77,8 +88,10 @@ export default function InstOverview() {
                       <td className="actions">
                         <Dropdown width={240} trigger={({ toggle }) => <button className="btn ghost sm icon" onClick={toggle} aria-label={`Actions for ${d.name}`}><MoreHorizontal /></button>}>
                           <button onClick={() => setDlg({ kind: 'edit', d })}><PenLine />Edit name and description</button>
+                          {d.status === 'Active' && (who.length
+                            ? <button onClick={() => setDlg({ kind: 'change', d })}><Replace />Change department admin</button>
+                            : <button onClick={() => nav(`/institute/admins?new=${d.id}`)}><UserPlus />Add department admin</button>)}
                           {d.status !== 'Archived' && <button onClick={() => setDlg({ kind: 'archive', d })}><Archive />Archive department</button>}
-                          <button disabled={deps > 0} onClick={() => setDlg({ kind: 'delete', d })}><Trash2 />{deps > 0 ? 'Delete · has records' : 'Delete department'}</button>
                         </Dropdown>
                       </td>
                     </tr>
@@ -87,57 +100,55 @@ export default function InstOverview() {
               </tbody>
             </table>
           </div>
-          <p className="hint">Departments with people or process history can’t be deleted. Archive them instead so approved processes and audit records stay available.</p>
+          <p className="hint">Departments are never deleted. Archive them instead so approved processes and audit records stay available. Department admins are managed on the <Link to="/institute/admins">Department admins</Link> page.</p>
         </div>
       </div>
 
       {(dlg?.kind === 'create' || dlg?.kind === 'edit') && (
-        <Modal title={dlg.kind === 'create' ? 'New department' : `Edit ${dlg.d.name}`} onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" onClick={() => { setDlg(null); toast(dlg.kind === 'create' ? 'Department created — invitation sent to its admin' : 'Department updated') }}>{dlg.kind === 'create' ? 'Create department' : 'Save changes'}</button></>}>
-          <div className="field"><label>Name</label><input className="input" defaultValue={dlg.d?.name} placeholder="e.g. Office of Student Affairs" /></div>
-          <div className="field"><label>Description</label><textarea className="textarea" defaultValue={dlg.d?.desc} placeholder="What this department is responsible for" /></div>
-          {dlg.kind === 'create' && (
-            <>
-              <div className="divider" />
-              <span className="label">Department admin</span>
-              <AdminFields />
-            </>
-          )}
-        </Modal>
+        <DepartmentDialog d={dlg.d} departments={departments} onClose={() => setDlg(null)}
+          onSave={(v) => {
+            if (dlg.d) { inst.updateDepartment(dlg.d.id, v); toast('Department updated') }
+            else { inst.addDepartment({ ...v, id: `d-${Date.now()}`, users: 0, supervisors: 0, processes: 0, status: 'Active' }); toast(`${v.name} created — add its admin from Department admins`) }
+            setDlg(null)
+          }} />
       )}
-      {dlg?.kind === 'admin' && (
-        <Modal title={`${dlg.d.admin === '—' ? 'Assign' : 'Replace'} admin for ${dlg.d.name}`} onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" onClick={() => { setDlg(null); toast('Department admin updated — invitation sent') }}>Save</button></>}>
-          {dlg.d.admin !== '—' && <p className="ink2 small">{dlg.d.admin} will lose admin access to this department.</p>}
-          <AdminFields />
-        </Modal>
-      )}
-      {dlg?.kind === 'archive' && (
-        <Modal title={`Archive ${dlg.d.name}?`} sub="Archived departments can’t receive new people or assignments." onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" disabled={dlg.d.users + dlg.d.supervisors > 0} onClick={() => { setDlg(null); toast('Department archived') }}><Archive />Archive</button></>}>
-          {dlg.d.users + dlg.d.supervisors > 0
-            ? <div className="notice warn"><Ban /><span><b>{dlg.d.users + dlg.d.supervisors} people are still active here.</b> Ask {dlg.d.admin} to reassign or deactivate them, and resolve pending reviews, before archiving.</span></div>
-            : <p className="ink2">Its {dlg.d.processes} approved processes, versions and audit history are kept and stay viewable to people with access.</p>}
-        </Modal>
-      )}
-      {dlg?.kind === 'delete' && (
-        <Modal title={`Delete ${dlg.d.name}?`} sub="This department has no people, assignments or process records." onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn danger solid" onClick={() => { setDlg(null); toast('Department deleted') }}><Trash2 />Delete permanently</button></>}>
-          <p className="ink2">This can’t be undone.</p>
-        </Modal>
-      )}
+      {dlg?.kind === 'change' && <ChangeAdmin dept={dlg.d} admins={admins} onClose={() => setDlg(null)} />}
+      {dlg?.kind === 'archive' && (() => {
+        const people = dlg.d.users + dlg.d.supervisors
+        const adms = adminsOf(admins, dlg.d.id).length
+        const blocked = people + adms > 0
+        return (
+          <Modal title={`Archive ${dlg.d.name}?`} sub="Archived departments can’t receive new people or assignments." onClose={() => setDlg(null)}
+            foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" disabled={blocked} onClick={() => { inst.updateDepartment(dlg.d.id, { status: 'Archived' }); setDlg(null); toast('Department archived') }}><Archive />Archive</button></>}>
+            {blocked
+              ? <div className="notice warn"><Ban /><span><b>{people + adms} people still hold a role here</b> ({people} users and supervisors, {adms} department admins). Reassign or deactivate them, and resolve pending reviews, before archiving.</span></div>
+              : <p className="ink2">Its {dlg.d.processes} approved processes, versions and audit history are kept and stay viewable to people with access.</p>}
+          </Modal>
+        )
+      })()}
     </>
   )
 }
 
-function AdminFields() {
+function DepartmentDialog({ d, departments, onSave, onClose }) {
+  const [name, setName] = useState(d?.name || '')
+  const [desc, setDesc] = useState(d?.desc || '')
+  const [err, setErr] = useState('')
+  const save = () => {
+    const n = name.trim()
+    let e = ''
+    if (!n) e = 'Department name is required'
+    else if (n.length < 2 || n.length > 100) e = 'Name must be 2–100 characters'
+    else if (departments.some((x) => x.id !== d?.id && x.status === 'Active' && x.name.toLowerCase() === n.toLowerCase())) e = 'An active department already has this name'
+    setErr(e)
+    if (!e) onSave({ name: n, desc: desc.trim() })
+  }
   return (
-    <>
-      <div className="grid-2" style={{ gap: 12 }}>
-        <div className="field"><label>Full name</label><input className="input" /></div>
-        <div className="field"><label>Institutional email</label><input className="input" placeholder="name@udallas.edu" /></div>
-      </div>
-      <span className="hint row gap1" style={{ gap: 6 }}><ShieldCheck size={12} />Linked to their UD ADFS account. They’ll get an invitation email.</span>
-    </>
+    <Modal title={d ? `Edit ${d.name}` : 'New department'} onClose={onClose}
+      sub={d ? undefined : 'Creates the department only. Add its Department Admin afterwards from the Department admins page.'}
+      foot={<><button className="btn ghost" onClick={onClose}>Cancel</button><button className="btn primary" onClick={save}>{d ? 'Save changes' : 'Create department'}</button></>}>
+      <div className="field"><label htmlFor="d-name">Name</label><input id="d-name" className="input" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); setErr('') }} placeholder="e.g. Office of Student Affairs" />{err && <span className="field-err" role="alert">{err}</span>}</div>
+      <div className="field"><label htmlFor="d-desc">Description<span className="opt">Optional</span></label><textarea id="d-desc" className="textarea" maxLength={500} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What this department is responsible for" /></div>
+    </Modal>
   )
 }

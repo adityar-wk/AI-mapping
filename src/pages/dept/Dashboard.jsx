@@ -1,12 +1,9 @@
-import { useNavigate } from 'react-router-dom'
-import { UserPlus } from 'lucide-react'
 import { Topbar } from '../../App'
 import { USERS, SUPERVISORS, PROCESSES } from '../../data'
 
 const DEPT = 'Office of Sponsored Programs'
 
 export default function DeptDashboard() {
-  const nav = useNavigate()
   const procs = PROCESSES.filter((p) => p.dept === DEPT)
   const by = (s) => procs.filter((p) => p.status === s).length
   const total = procs.length
@@ -16,9 +13,7 @@ export default function DeptDashboard() {
 
   return (
     <>
-      <Topbar title="Department summary">
-        <button className="btn primary" onClick={() => nav('/dept/people?new=1')}><UserPlus />Add person</button>
-      </Topbar>
+      <Topbar title="Department summary" />
       <div className="page">
         <div className="page-head">
           <div><p className="lede">People, reporting lines and processes in {DEPT}</p></div>

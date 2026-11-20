@@ -18,13 +18,28 @@ export const PERSONAS = {
 }
 
 export const DEPARTMENTS = [
-  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', admin: 'Priya Natarajan', users: 14, supervisors: 3, processes: 22, status: 'Active' },
-  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', admin: 'Kevin Marsh', users: 19, supervisors: 4, processes: 31, status: 'Active' },
-  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', admin: 'Alicia Gomez', users: 11, supervisors: 2, processes: 17, status: 'Active' },
-  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', admin: 'Jonah Pierce', users: 8, supervisors: 2, processes: 9, status: 'Active' },
-  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', admin: 'Sara Lindqvist', users: 9, supervisors: 2, processes: 12, status: 'Active' },
-  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', admin: '—', users: 0, supervisors: 0, processes: 0, status: 'Setup pending' },
-  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', admin: '—', users: 0, supervisors: 0, processes: 6, status: 'Archived' },
+  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', users: 14, supervisors: 3, processes: 22, status: 'Active' },
+  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', users: 19, supervisors: 4, processes: 31, status: 'Active' },
+  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', users: 11, supervisors: 2, processes: 17, status: 'Active' },
+  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', users: 8, supervisors: 2, processes: 9, status: 'Active' },
+  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', users: 9, supervisors: 2, processes: 12, status: 'Active' },
+  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', users: 0, supervisors: 0, processes: 0, status: 'Active' },
+  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', users: 0, supervisors: 0, processes: 6, status: 'Archived' },
+]
+
+// Department Admins are users with a DEPT_ADMIN role on one department (app_user + role_assignment).
+// They are created on Institute Admin → Department admins, never as part of creating a department.
+const da = (id, firstName, lastName, departmentId, email, phone, status, created) => ({
+  id, firstName, lastName, departmentId, email, countryCode: '+1', phone, status, created,
+  address: '1845 E Northgate Dr', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75062',
+})
+export const DEPT_ADMINS = [
+  da('da-1', 'Priya', 'Natarajan', 'osp', 'pnatarajan@udallas.edu', '9727215101', 'Active', '2026-02-03'),
+  da('da-2', 'Kevin', 'Marsh', 'reg', 'kmarsh@udallas.edu', '9727215102', 'Active', '2026-02-03'),
+  da('da-3', 'Alicia', 'Gomez', 'fa', 'agomez@udallas.edu', '9727215103', 'Active', '2026-02-10'),
+  da('da-4', 'Jonah', 'Pierce', 'car', 'jpierce@udallas.edu', '9727215104', 'Active', '2026-03-02'),
+  da('da-5', 'Sara', 'Lindqvist', 'mkt', 'slindqvist@udallas.edu', '9727215105', 'Invited', '2026-11-12'),
+  da('da-6', 'Owen', 'Hartley', 'cce', 'ohartley@udallas.edu', '9727215106', 'Deactivated', '2025-01-15'),
 ]
 
 export const CATEGORIES = ['Grants', 'Compliance', 'Student records', 'Finance', 'Onboarding', 'Communications']
@@ -110,12 +125,20 @@ export const DOC = {
   exceptions: null, // intentionally missing → shows "needs clarification"
 }
 
+// Full onboarding profile (same fields as the admin forms). Seed rows only had name + email.
+const withProfile = (p, i) => ({
+  firstName: p.name.split(' ')[0], lastName: p.name.split(' ').slice(1).join(' '),
+  countryCode: '+1', phone: `97272153${String(i).padStart(2, '0')}`,
+  address: '1845 E Northgate Dr', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75062',
+  departmentId: 'osp', created: p.status === 'Invited' ? '2026-11-14' : '2026-03-02', ...p,
+})
+
 export const SUPERVISORS = [
   { id: 's1', name: 'Daniel Reyes', email: 'dreyes@udallas.edu', team: 'Pre-award', users: 5, pending: 3, status: 'Active', history: true },
   { id: 's2', name: 'Angela Wu', email: 'awu@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Deactivated', history: true },
   { id: 's3', name: 'Marcus Bell', email: 'mbell@udallas.edu', team: 'Compliance', users: 4, pending: 1, status: 'Active', history: true },
   { id: 's4', name: 'Grace Tran', email: 'gtran@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Invited', history: false },
-]
+].map(withProfile)
 
 export const USERS = [
   { id: 'u1', name: 'Maria Okafor', email: 'mokafor@udallas.edu', supervisor: 'Daniel Reyes', drafts: 1, processes: 4, status: 'Active', history: true, lastActive: '2026-11-16' },
@@ -124,7 +147,7 @@ export const USERS = [
   { id: 'u4', name: 'Samuel Ortiz', email: 'sortiz@udallas.edu', supervisor: 'Marcus Bell', drafts: 2, processes: 5, status: 'Active', history: true, lastActive: '2026-11-11' },
   { id: 'u5', name: 'Nora Feld', email: 'nfeld@udallas.edu', supervisor: null, drafts: 0, processes: 0, status: 'Invited', history: false, lastActive: '—' },
   { id: 'u6', name: 'Ian Whitaker', email: 'iwhitaker@udallas.edu', supervisor: 'Marcus Bell', drafts: 1, processes: 6, status: 'Deactivated', history: true, lastActive: '2026-09-02' },
-]
+].map((p, i) => withProfile(p, i + 10))
 
 export const GRANTS = [
   { id: 'g2', kind: 'Department', who: 'Office of Sponsored Programs', target: 'Career Services', by: 'Thomas Healy', at: '2026-08-12' },
@@ -133,10 +156,18 @@ export const GRANTS = [
 ]
 
 export const INSTITUTES = [
-  { id: 'udallas', name: 'University of Dallas', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', admin: 'Thomas Healy', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12' },
-  { id: 'smu-pilot', name: 'Northlake Community College', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', admin: 'Renee Castillo', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01' },
-  { id: 'stmary', name: 'St. Brendan Seminary', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', admin: null, status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03' },
-  { id: 'old', name: 'Trinity Valley Institute', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', admin: 'Mark Ellison', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15' },
+  { id: 'udallas', name: 'University of Dallas', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12', website: 'https://udallas.edu', address: '1845 E Northgate Dr', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75062', campuses: ['Irving Campus', 'Rome Campus'], sso: { status: 'Active', discoveryUrl: 'https://sso.udallas.edu/adfs/.well-known/openid-configuration', clientId: '7c1e4b9a-2f6d-4e8a-9b3c-51d0a7e2f4c8', secretSetAt: '2026-05-14', lastTest: { ok: true, at: '2026-05-14 10:42' } }, description: 'Private Catholic university with undergraduate, graduate and business programs.' },
+  { id: 'smu-pilot', name: 'Northlake Community College', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01', website: 'https://northlake.edu', address: '5001 N MacArthur Blvd', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75038', campuses: ['Main Campus'], sso: { status: 'Draft', discoveryUrl: 'https://adfs.northlake.edu/adfs/.well-known/openid-configuration', clientId: 'b2d9f0c4-61a7-4c3e-8f15-9e0a2c7d6b31', secretSetAt: '2026-11-18', lastTest: null }, description: '' },
+  { id: 'stmary', name: 'St. Brendan Seminary', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03', website: 'https://stbrendan.org', address: '200 Seminary Road', country: 'United States', state: 'New York', city: 'Albany', zipcode: '12203', campuses: ['Seminary Campus'], sso: null, description: '' },
+  { id: 'old', name: 'Trinity Valley Institute', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15', website: 'https://tvi.edu', address: '17 Valley View Lane', country: 'United States', state: 'Texas', city: 'Valley View', zipcode: '76272', campuses: ['North Campus', 'South Campus'], sso: { status: 'Disabled', discoveryUrl: 'https://sso.tvi.edu/adfs/.well-known/openid-configuration', clientId: 'e5a3c8d1-0b4f-47e2-a6d9-3c1f8b2e7a05', secretSetAt: '2025-09-20', lastTest: { ok: true, at: '2025-09-20 15:08' } }, description: 'Archived after merger.' },
+]
+
+// Institute Admins, onboarded by the Super Admin from User management.
+// Each belongs to exactly one institute; the email must use that institute's domain.
+export const INSTITUTE_ADMINS = [
+  { id: 'ia-1', instituteId: 'udallas', firstName: 'Thomas', lastName: 'Healy', email: 'thealy@udallas.edu', countryCode: '+1', phone: '9725550142', address: '1845 E Northgate Dr', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75062', status: 'Active', created: '2026-05-12' },
+  { id: 'ia-2', instituteId: 'smu-pilot', firstName: 'Renee', lastName: 'Castillo', email: 'rcastillo@northlake.edu', countryCode: '+1', phone: '9725550178', address: '5001 N MacArthur Blvd', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75038', status: 'Active', created: '2026-08-01' },
+  { id: 'ia-3', instituteId: 'old', firstName: 'Mark', lastName: 'Ellison', email: 'mellison@tvi.edu', countryCode: '+1', phone: '9405550110', address: '17 Valley View Lane', country: 'United States', state: 'Texas', city: 'Valley View', zipcode: '76272', status: 'Deactivated', created: '2025-09-15' },
 ]
 
 export const NOTIFICATIONS = {

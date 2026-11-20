@@ -1,9 +1,27 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { UserPlus, MoreHorizontal, PenLine, UserX, Trash2, ArrowRightLeft, Search, Mail, ShieldCheck, Info, Users, AlertTriangle } from 'lucide-react'
+import { UserPlus, MoreHorizontal, UserX, Trash2, ArrowRightLeft, Search, Mail, Info, Users, AlertTriangle, Eye } from 'lucide-react'
 import { Topbar } from '../../App'
-import { USERS, SUPERVISORS } from '../../data'
+import { USERS, SUPERVISORS, INSTITUTE, PERSONAS } from '../../data'
 import { Avatar, Dropdown, Modal, Tag, useToast } from '../../components/ui'
+import { AdminFields, AdminProfile, useAdminForm, emptyAdmin, clean, adminName } from '../../components/AdminForm'
+
+// Department Admin → Users & supervisors. Onboarding uses the same profile fields as the
+// shared AdminForm, contact fields only (first/last name, role, email, phone),
+// plus a supervisor for Users (mandatory). The department is always
+// the Department Admin's own one (POST /departments/:id/members).
+const DEPT_ID = 'osp'
+const DEPT_NAME = PERSONAS.deptAdmin.dept
+
+const personScope = (role, { creating } = {}) => ({
+  key: 'departmentId', label: 'Department', role: role === 'user' ? 'User' : 'Supervisor', fixed: true, noAddress: true, contactFirst: true, searchableCode: true,
+  options: [{ id: DEPT_ID, name: DEPT_NAME }],
+  domainOf: () => INSTITUTE.domain,
+  pickHint: creating ? 'People you add always join your department.' : '',
+  dupMessage: `Already a ${role === 'user' ? 'user' : 'supervisor'} in this department`,
+  extraValidate: (v) => (role === 'user' && creating && !v.supervisor ? { supervisor: 'Select a supervisor. Every user needs one to submit processes for review.' } : {}),
+  extraRows: (p) => (role === 'user' ? [['Role', 'User'], ['Supervisor', p.supervisor || 'Not assigned']] : [['Role', 'Supervisor']]),
+})
 
 const statusTag = (s) => <Tag kind={s === 'Active' ? 'approved' : s === 'Invited' ? 'review' : 'draft'}>{s}</Tag>
 
@@ -12,7 +30,7 @@ export default function People() {
   const toast = useToast()
   const [tab, setTab] = useState(qs.get('tab') || 'users')
   const [users, setUsers] = useState(USERS)
-  const [sups] = useState(SUPERVISORS)
+  const [sups, setSups] = useState(SUPERVISORS)
   const [dlg, setDlg] = useState(qs.get('new') ? { kind: 'create' } : null)
   const [q, setQ] = useState('')
   const activeSups = sups.filter((s) => s.status !== 'Deactivated')
@@ -26,7 +44,7 @@ export default function People() {
       </Topbar>
       <div className="page">
         <div className="page-head">
-          <div><p className="lede">Platform profiles link to existing UD accounts. Adding someone sends an invitation; they sign in with ADFS — no new passwords.</p></div>
+          <div><p className="lede">Adding someone sends an invitation email. They activate their account with an email code and set a password, or sign in with ADFS if your institute has it enabled.</p></div>
         </div>
 
         <div className="tabs">
@@ -68,12 +86,11 @@ export default function People() {
         {tab === 'sups' && (
           <div className="card">
             <table className="table">
-              <thead><tr><th>Name</th><th>Team</th><th className="right">Users</th><th className="right">Pending reviews</th><th>Status</th><th className="actions" /></tr></thead>
+              <thead><tr><th>Name</th><th className="right">Users</th><th className="right">Pending reviews</th><th>Status</th><th className="actions" /></tr></thead>
               <tbody>
                 {sups.filter((u) => !q || (u.name + u.email).toLowerCase().includes(q.toLowerCase())).map((s) => (
                   <tr key={s.id}>
                     <td><div className="row gap2"><Avatar name={s.name} /><div className="stack" style={{ gap: 0 }}><span className="t-title">{s.name}</span><span className="hint">{s.email}</span></div></div></td>
-                    <td className="ink2">{s.team}</td>
                     <td className="right num">{s.users}</td>
                     <td className="right num">{s.pending}</td>
                     <td>{statusTag(s.status)}{s.status === 'Deactivated' && <div className="hint">Approvals kept in history</div>}</td>
@@ -100,8 +117,35 @@ export default function People() {
         <AddUsersDialog sup={dlg.sup} users={users.filter((u) => u.status !== 'Deactivated' && u.supervisor !== dlg.sup.name)} onClose={() => setDlg(null)}
           onDone={(ids) => { setUsers((all) => all.map((x) => (ids.includes(x.id) ? { ...x, supervisor: dlg.sup.name } : x))); setDlg(null); toast(`${ids.length} user${ids.length > 1 ? 's' : ''} now report to ${dlg.sup.name}`) }} />
       )}
-      {dlg?.kind === 'create' && <CreateDialog onClose={() => setDlg(null)} sups={activeSups} onDone={(n) => { setDlg(null); toast(`Invitation sent to ${n}`) }} />}
-      {dlg?.kind === 'edit' && <CreateDialog edit person={dlg.person} role={dlg.role} onClose={() => setDlg(null)} sups={activeSups} onDone={() => { setDlg(null); toast('Profile updated') }} />}
+      {dlg?.kind === 'create' && (
+        <AddPerson users={users} sups={sups} activeSups={activeSups} onClose={() => setDlg(null)}
+          onCreate={(role, p) => {
+            const other = (role === 'user' ? sups : users).some((x) => x.email === p.email)
+            if (role === 'user') setUsers((all) => [...all, { ...p, drafts: 0, processes: 0, history: false, lastActive: '—' }])
+            else setSups((all) => [...all, { ...p, users: 0, pending: 0, history: false }])
+            setDlg(null)
+            toast(other ? `${p.name} already has an account — ${role === 'user' ? 'User' : 'Supervisor'} role added` : `${role === 'user' ? 'User' : 'Supervisor'} created — invitation sent to ${p.email}`)
+          }} />
+      )}
+      {dlg?.kind === 'edit' && (() => {
+        const list = dlg.role === 'user' ? users : sups
+        const person = list.find((x) => x.id === dlg.person.id)
+        return (
+          <AdminProfile key={person.id} admin={person} scope={personScope(dlg.role)} people={list} onClose={() => setDlg(null)}
+            actions={dlg.role === 'user' && person.status !== 'Deactivated'
+              ? <button className="btn sm" onClick={() => setDlg({ kind: 'supervisor', person, role: 'user' })}><ArrowRightLeft />{person.supervisor ? 'Change supervisor' : 'Assign supervisor'}</button>
+              : undefined}
+            onSave={(id, v) => {
+              const patch = { ...v, name: adminName(v) }
+              if (dlg.role === 'user') setUsers((all) => all.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+              else {
+                setSups((all) => all.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+                // users point at their supervisor by name in this prototype; keep them in step with a rename
+                if (patch.name !== person.name) setUsers((all) => all.map((x) => (x.supervisor === person.name ? { ...x, supervisor: patch.name } : x)))
+              }
+            }} />
+        )
+      })()}
       {dlg?.kind === 'deactivate' && <DeactivateDialog p={dlg.person} role={dlg.role} sups={activeSups.filter((s) => s.name !== dlg.person.name)} users={users.filter((u) => u.status === 'Active' && u.id !== dlg.person.id)} onClose={() => setDlg(null)} onDone={() => { setDlg(null); toast(`${dlg.person.name} deactivated — sessions ended`) }} />}
       {dlg?.kind === 'delete' && (
         <Modal title={`Delete ${dlg.person.name}?`} sub="This permanently removes a profile that has no history." onClose={() => setDlg(null)}
@@ -118,41 +162,51 @@ function RowMenu({ person, kind, onPick }) {
   const deactivated = person.status === 'Deactivated'
   return (
     <Dropdown width={250} trigger={({ toggle }) => <button className="btn ghost sm icon" onClick={toggle} aria-label={`Actions for ${person.name}`}><MoreHorizontal /></button>}>
-      <button onClick={() => onPick('edit')}><PenLine />Edit profile</button>
+      <button onClick={() => onPick('edit')}><Eye />View profile</button>
       {kind === 'user' && !deactivated && <button onClick={() => onPick('supervisor')}><ArrowRightLeft />{person.supervisor ? 'Change supervisor' : 'Assign supervisor'}</button>}
-      {kind === 'supervisor' && <button onClick={() => onPick('edit')}><ArrowRightLeft />Change team</button>}
       {!deactivated && <button onClick={() => onPick('deactivate')}><UserX />Deactivate</button>}
       <button disabled={hasHistory} onClick={() => onPick('delete')} title={hasHistory ? 'Has historical activity' : ''}><Trash2 />{hasHistory ? 'Delete · has history' : 'Delete profile'}</button>
     </Dropdown>
   )
 }
 
-function CreateDialog({ onClose, onDone, sups, edit, person, role: r0 }) {
-  const [role, setRole] = useState(r0 || 'user')
-  const [name, setName] = useState(person?.name || '')
-  const [email, setEmail] = useState(person?.email || '')
-  const valid = name.trim() && /@udallas\.edu$/.test(email)
+function AddPerson({ users, sups, activeSups, onClose, onCreate }) {
+  const [role, setRole] = useState('user')
+  const scope = personScope(role, { creating: true })
+  const f = useAdminForm({ ...emptyAdmin(scope, DEPT_ID), supervisor: '' }, { scope, people: role === 'user' ? users : sups })
+  const submit = () => {
+    if (!f.check()) return
+    const v = clean(f.v)
+    const base = { ...v, name: adminName(v), id: `${role === 'user' ? 'u' : 's'}-${Date.now()}`, status: 'Invited', created: new Date().toISOString().slice(0, 10) }
+    if (role !== 'user') delete base.supervisor
+    // Not collected for department members
+    for (const k of ['address', 'country', 'state', 'city', 'zipcode']) delete base[k]
+    onCreate(role, base)
+  }
   return (
-    <Modal title={edit ? `Edit ${person.name}` : 'Add a person'} sub={edit ? 'Changes apply to this platform profile only — not to the UD account.' : 'Creates a platform profile in Office of Sponsored Programs.'} onClose={onClose}
-      foot={<><button className="btn ghost" onClick={onClose}>Cancel</button><button className="btn primary" disabled={!valid} onClick={() => onDone(name)}>{edit ? 'Save changes' : <><Mail />Create and send invitation</>}</button></>}>
-      {!edit && (
-        <div className="field"><label>Role</label>
-          <div className="seg" style={{ alignSelf: 'flex-start' }}><button className={role === 'user' ? 'on' : ''} onClick={() => setRole('user')}>User</button><button className={role === 'supervisor' ? 'on' : ''} onClick={() => setRole('supervisor')}>Supervisor</button></div>
-        </div>
-      )}
-      <div className="field"><label htmlFor="nm">Full name</label><input id="nm" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
-      <div className="field"><label htmlFor="ml">Institutional email</label><input id="ml" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@udallas.edu" readOnly={edit} />
-        <span className="hint row gap1" style={{ gap: 6 }}><ShieldCheck size={12} />{edit ? 'Linked to the UD ADFS identity — cannot be changed here.' : 'Used to link the profile to their existing UD ADFS account.'}</span>
-      </div>
-      {role === 'user' ? (
-        <div className="field"><label>Supervisor</label><select className="select" defaultValue={person?.supervisor || ''}><option value="">Assign later</option>{sups.map((s) => <option key={s.id}>{s.name}</option>)}</select><span className="hint">Submissions from this user go to their supervisor for review.</span></div>
-      ) : (
-        <div className="field"><label htmlFor="team">Team</label>
-          <input id="team" className="input" list="team-options" defaultValue={person?.team || ''} placeholder="Pick a team or type a new one" />
-          <datalist id="team-options">{['Pre-award', 'Post-award', 'Compliance'].map((t) => <option key={t} value={t} />)}</datalist>
-          <span className="hint">Teams are labels within this department. Typing a new name creates it.</span>
-        </div>
-      )}
+    <Modal lg title="Add a person" sub={`Onboard a User or Supervisor in ${DEPT_NAME}. They get an email to activate their account.`} onClose={onClose}
+      foot={<><button className="btn ghost" onClick={onClose}>Cancel</button><button className="btn primary" onClick={submit}><Mail />Create and send invitation</button></>}>
+      <AdminFields v={f.v} set={f.set} errors={f.errors} scope={scope}
+        extra={({ v, set, err }) => (
+          <>
+            <div className="field"><span className="label">Role</span>
+              <div className="seg" role="tablist" aria-label="Role" style={{ alignSelf: 'flex-start' }}>
+                <button role="tab" className={role === 'user' ? 'on' : ''} onClick={() => setRole('user')}>User</button>
+                <button role="tab" className={role === 'supervisor' ? 'on' : ''} onClick={() => setRole('supervisor')}>Supervisor</button>
+              </div>
+              <span className="hint">{role === 'user' ? 'Users create and update process maps and submit them to their supervisor.' : 'Supervisors review, revise and approve the process maps of their team.'}</span>
+            </div>
+            {role === 'user' ? (
+              <div className="field"><label htmlFor="p-sup">Supervisor</label>
+                <select id="p-sup" className="select" value={v.supervisor} onChange={(e) => set({ supervisor: e.target.value })}>
+                  <option value="">Select supervisor</option>
+                  {activeSups.map((x) => <option key={x.id} value={x.name}>{x.name}{x.status === 'Invited' ? ' (invited)' : ''}</option>)}
+                </select>
+                {err('supervisor') || <span className="hint">Submissions from this user go to this supervisor for review.</span>}
+              </div>
+            ) : null}
+          </>
+        )} />
     </Modal>
   )
 }
@@ -202,7 +256,7 @@ function ReportingStructure({ users, sups: allSups, onAdd, onMove, q = '' }) {
             <Avatar name={x.name} />
             <span className="stack grow" style={{ gap: 1, minWidth: 0 }}>
               <span style={{ fontWeight: 600 }}>{x.name}</span>
-              <span className="hint">{x.team}{x.status === 'Invited' ? ' · invited' : ''}</span>
+              <span className="hint">{x.email}{x.status === 'Invited' ? ' · invited' : ''}</span>
             </span>
             <span className="rs-count">{team(x.name).length}</span>
           </button>
@@ -221,7 +275,7 @@ function ReportingStructure({ users, sups: allSups, onAdd, onMove, q = '' }) {
               <Avatar name={current.name} />
               <div className="stack" style={{ gap: 1 }}>
                 <h3>{current.name}’s team</h3>
-                <span className="hint">{current.team} · {members.length} user{members.length === 1 ? '' : 's'} · {current.pending} pending review{current.pending === 1 ? '' : 's'}</span>
+                <span className="hint">{members.length} user{members.length === 1 ? '' : 's'} · {current.pending} pending review{current.pending === 1 ? '' : 's'}</span>
               </div>
             </div>
           ) : (
@@ -271,7 +325,7 @@ function ChangeSupervisorDialog({ user, sups, onClose, onDone }) {
       <div className="field"><label>New supervisor</label>
         <select className="select" value={to} onChange={(e) => setTo(e.target.value)}>
           <option value="">Choose a supervisor…</option>
-          {options.map((x) => <option key={x.id} value={x.name}>{x.name} · {x.team}</option>)}
+          {options.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
         </select>
       </div>
       {user.supervisor && <div className="notice info"><Info /><span>Submissions waiting for review move to the new supervisor, with their feedback history.</span></div>}

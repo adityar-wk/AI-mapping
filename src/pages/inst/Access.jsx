@@ -9,7 +9,7 @@ export default function Access() {
   const [grants, setGrants] = useState(GRANTS)
   const [dlg, setDlg] = useState(null)
   const [q, setQ] = useState('')
-  const active = DEPARTMENTS.filter((d) => d.status !== 'Setup pending')
+  const active = DEPARTMENTS.filter((d) => d.status === 'Active')
   const rows = grants.filter((g) => !q || `${g.who} ${g.target}`.toLowerCase().includes(q.toLowerCase()))
 
   return (

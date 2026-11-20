@@ -25,6 +25,7 @@ import Access from './pages/inst/Access'
 import Suspensions from './pages/inst/Suspensions'
 import Institutes from './pages/platform/Institutes'
 import Usage from './pages/platform/Usage'
+import UserManagement from './pages/platform/UserManagement'
 import States from './pages/States'
 import ComponentLibrary from './pages/ComponentLibrary'
 
@@ -69,6 +70,7 @@ const NAV = {
   superAdmin: [
     { label: 'Platform', items: [
       { to: '/platform', icon: Landmark, label: 'Institutes', end: true },
+      { to: '/platform/users', icon: UserCog, label: 'User management' },
       { to: '/platform/usage', icon: BarChart3, label: 'Usage by institute' },
     ] },
   ],
@@ -198,6 +200,7 @@ export default function App() {
             <Route path="/institute/suspensions" element={<Suspensions />} />
             <Route path="/platform" element={<Institutes />} />
             <Route path="/platform/usage" element={<Usage />} />
+            <Route path="/platform/users" element={<UserManagement />} />
             <Route path="/states" element={<States />} />
             <Route path="/components" element={<ComponentLibrary />} />
             <Route path="*" element={<Navigate to="/" replace />} />

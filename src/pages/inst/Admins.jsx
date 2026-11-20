@@ -1,71 +1,65 @@
 import { useState } from 'react'
-import { KeyRound, Replace, UserPlus, ShieldCheck, Loader2, MoreHorizontal } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Plus, Search, Eye } from 'lucide-react'
 import { Topbar } from '../../App'
-import { DEPARTMENTS } from '../../data'
-import { Avatar, Modal, Tag, Dropdown, useToast } from '../../components/ui'
+import { CreateAdmin, AdminProfile, adminName, statusTag } from '../../components/AdminForm'
+import { useInstitute, inst, departmentScope } from './store'
+
+// Institute Admin → Department admins: onboard and maintain Department Admins.
+// Separate from creating a department: POST /departments/:id/admins creates
+// app_user (INVITED) + role_assignment(DEPT_ADMIN) + an invitation email.
+// Address fields aren't collected for Department Admins.
+const strip = ({ address, country, state, city, zipcode, ...rest }) => rest
 
 export default function DeptAdmins() {
-  const toast = useToast()
-  const [dlg, setDlg] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const rows = DEPARTMENTS.filter((d) => d.status !== 'Archived')
+  const { departments, admins } = useInstitute()
+  const [qs, setQs] = useSearchParams()
+  const preset = qs.get('new')
+  const [creating, setCreating] = useState(preset !== null)
+  const [q, setQ] = useState('')
+  const [openId, setOpenId] = useState(null)
+  const scope = departmentScope(departments)
+  const deptName = (id) => departments.find((d) => d.id === id)?.name || '—'
+  const rows = admins.filter((a) => !q || `${adminName(a)} ${deptName(a.departmentId)} ${a.email}`.toLowerCase().includes(q.toLowerCase()))
+  const open = admins.find((a) => a.id === openId)
+  const closeCreate = () => { setCreating(false); if (preset !== null) setQs({}, { replace: true }) }
+
   return (
     <>
-      <Topbar title="Department admins" />
+      <Topbar title="Department admins">
+        <button className="btn primary" onClick={() => setCreating(true)}><Plus />Create user</button>
+      </Topbar>
       <div className="page">
-        <div className="page-head"><div><p className="lede">Each department has one admin who manages its users and supervisors. Admin rights don’t include editing or approving processes.</p></div></div>
+        <p className="lede muted">Department Admins manage the users and supervisors of their department. Admin rights don’t include editing or approving processes.</p>
+        <div className="row spread wrap gap2">
+          <div className="search" style={{ width: 340 }}><Search /><input className="input" placeholder="Search by name, department or email" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search department admins" /></div>
+          <span className="hint num">{rows.length} of {admins.length} admins</span>
+        </div>
         <div className="card">
           <table className="table">
-            <thead><tr><th>Department</th><th>Admin</th><th>Institutional email</th><th>Status</th><th className="actions">Actions</th></tr></thead>
+            <thead><tr><th style={{ width: 72 }}>Sr. No</th><th>Admin name</th><th>Department</th><th>Email ID</th><th className="right">Action</th></tr></thead>
             <tbody>
-              {rows.map((d) => {
-                const none = d.admin === '—'
-                const email = none ? '' : `${d.admin.split(' ')[0][0].toLowerCase()}${d.admin.split(' ')[1].toLowerCase()}@udallas.edu`
-                return (
-                  <tr key={d.id}>
-                    <td className="t-title">{d.name}</td>
-                    <td>
-                      {none ? <span className="muted">Not assigned</span> : <span className="row gap2"><Avatar name={d.admin} sm />{d.admin}</span>}
-                    </td>
-                    <td className="ink2">{email || '—'}</td>
-                    <td>{none ? <Tag kind="returned">Needs admin</Tag> : <Tag kind="approved">Active</Tag>}</td>
-                    <td className="actions">
-                      <Dropdown width={200} trigger={({ toggle }) => <button className="btn ghost sm icon" onClick={toggle} aria-label={`Actions for ${d.name}`}><MoreHorizontal /></button>}>
-                        {none ? (
-                          <button onClick={() => setDlg({ kind: 'assign', d })}><UserPlus />Assign admin</button>
-                        ) : (
-                          <>
-                            <button onClick={() => setDlg({ kind: 'assign', d })}><Replace />Replace admin</button>
-                            <button onClick={() => setDlg({ kind: 'reset', d })}><KeyRound />Reset password</button>
-                          </>
-                        )}
-                      </Dropdown>
-                    </td>
-                  </tr>
-                )
-              })}
+              {rows.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 32 }}>{admins.length ? `No admins match “${q}”.` : 'No Department Admins yet. Use Create user to onboard one.'}</td></tr>}
+              {rows.map((a, n) => (
+                <tr key={a.id} className="clickable" onClick={() => setOpenId(a.id)}>
+                  <td className="num ink2">{n + 1}</td>
+                  <td><span className="row gap2"><span className="t-title">{adminName(a)}</span>{a.status !== 'Active' && statusTag(a.status)}</span></td>
+                  <td>{deptName(a.departmentId)}</td>
+                  <td className="ink2">{a.email}</td>
+                  <td className="right"><button className="btn sm" onClick={(e) => { e.stopPropagation(); setOpenId(a.id) }} aria-label={`View profile of ${adminName(a)}`}><Eye />View profile</button></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {dlg?.kind === 'assign' && (
-        <Modal title={`${dlg.d.admin === '—' ? 'Assign' : 'Replace'} admin for ${dlg.d.name}`} onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" onClick={() => { setDlg(null); toast('Department admin updated') }}>Save</button></>}>
-          {dlg.d.admin !== '—' && <p className="ink2 small">{dlg.d.admin} will lose admin access to this department.</p>}
-          <div className="grid-2" style={{ gap: 12 }}>
-            <div className="field"><label>Full name</label><input className="input" /></div>
-            <div className="field"><label>Institutional email</label><input className="input" placeholder="name@udallas.edu" /></div>
-          </div>
-          <span className="hint row gap1" style={{ gap: 6 }}><ShieldCheck size={12} />Linked to their UD ADFS account. They’ll get an invitation email.</span>
-        </Modal>
+      {creating && (
+        <CreateAdmin scope={scope} people={admins} preset={preset || ''} onClose={closeCreate}
+          sub="Onboard a Department Admin. They get an email to activate their account (email OTP, then set a password) or can sign in with ADFS if it’s enabled."
+          onCreate={(v) => inst.addAdmin({ ...strip(v), id: `da-${Date.now()}`, status: 'Invited', created: new Date().toISOString().slice(0, 10) })} />
       )}
-      {dlg?.kind === 'reset' && (
-        <Modal title={`Reset password for ${dlg.d.admin}?`} sub="Runs through UD’s identity management. Process Atlas never sets or sees the password." onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" disabled={busy} onClick={() => { setBusy(true); setTimeout(() => { setBusy(false); setDlg(null); toast(`Reset link sent to ${dlg.d.admin}`) }, 900) }}>{busy ? <><Loader2 className="spin" />Requesting…</> : <><KeyRound />Send reset</>}</button></>}>
-          <p className="ink2">{dlg.d.admin} will receive UD’s standard reset instructions at their institutional email. Their current sign-in stays valid until they change it.</p>
-        </Modal>
-      )}
+      {open && <AdminProfile key={open.id} admin={open} scope={scope} people={admins} onSave={inst.updateAdmin} onClose={() => setOpenId(null)} />}
     </>
   )
 }

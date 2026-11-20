@@ -197,6 +197,9 @@ p { margin: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > label, .label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .hint { font-size: 12px; color: var(--ink-3); }
+.field-err { font-size: 12px; color: var(--brick); }
+.field .opt { font-weight: 400; color: var(--ink-4); margin-left: 4px; }
+.admin-compact .grid-2 { grid-template-columns: 1fr; }
 .input, .textarea, .select {
   width: 100%; border: 1px solid var(--rule); background: var(--sheet);
   border-radius: 8px; padding: 9px 12px; font-size: 13.5px;
@@ -749,3 +752,13 @@ p { margin: 0; }
 .tr-seg { border-radius: 4px; padding: 1px 2px; cursor: pointer; box-shadow: inset 0 -1.5px 0 var(--navy-wash); transition: background 120ms var(--ease); }
 .tr-seg:hover { background: var(--navy-tint); box-shadow: inset 0 -1.5px 0 var(--navy); }
 .tr-rerec { display: inline-flex; align-items: center; gap: 8px; color: var(--navy); font-weight: 600; font-size: 13.5px; }
+
+/* Searchable country-code picker (AdminForm) */
+.cc-btn { width: 116px; text-align: left; white-space: nowrap; font: inherit; color: var(--ink); }
+.cc-btn .mono-ish { color: var(--ink-3); font-size: 12px; font-weight: 600; margin-right: 2px; }
+.cc-pop { z-index: 1000; background: var(--sheet-raised); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.35); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.cc-pop .search { width: 100%; }
+.cc-list { list-style: none; margin: 0; padding: 0; max-height: 236px; overflow: auto; }
+.cc-opt { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+.cc-opt.hi { background: var(--well); }
+.cc-name { display: inline-flex; align-items: center; gap: 8px; }
