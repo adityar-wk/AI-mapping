@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, ChevronRight, X, Pause, Play, Archive, UserCog, UserMinus, Copy, Search } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, ChevronRight, X, Pause, Play, Archive, UserCog, UserMinus, Copy, Search, Phone } from 'lucide-react'
 import { Topbar } from '../../App'
 import { INSTITUTES } from '../../data'
 import { Drawer, Modal, Tag, Avatar, useToast } from '../../components/ui'
@@ -12,7 +12,8 @@ export default function Institutes() {
   const [open, setOpen] = useState(null)
   const [dlg, setDlg] = useState(null)
   const [q, setQ] = useState('')
-  const rows = list.filter((i) => !q || `${i.name} ${i.domain} ${i.tenant}`.toLowerCase().includes(q.toLowerCase()))
+  const [valid, setValid] = useState(false)
+  const rows = list.filter((i) => !q || `${i.name} ${i.branch} ${i.domain} ${i.tenant} ${i.address?.city}`.toLowerCase().includes(q.toLowerCase()))
   const inst = list.find((i) => i.id === open)
   const setStatus = (id, status) => { setList((l) => l.map((x) => (x.id === id ? { ...x, status } : x))); setDlg(null); toast(`Institute ${status.toLowerCase()}`) }
 
@@ -24,7 +25,7 @@ export default function Institutes() {
       <div className="page">
         <p className="lede muted">Each institute is an isolated tenant: its people, departments, files and processes are never visible to another.</p>
         <div className="row spread wrap gap2">
-          <div className="search" style={{ width: 340 }}><Search /><input className="input" placeholder="Search by name, domain or tenant ID" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search institutes" /></div>
+          <div className="search" style={{ width: 340 }}><Search /><input className="input" placeholder="Search by name, branch, city, domain or tenant ID" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search institutes" /></div>
           <span className="hint num">{rows.length} of {list.length} institutes</span>
         </div>
         <div className="card">
@@ -34,7 +35,7 @@ export default function Institutes() {
               {rows.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 32 }}>No institutes match “{q}”.</td></tr>}
               {rows.map((i) => (
                 <tr key={i.id} className="clickable" onClick={() => setOpen(i.id)}>
-                  <td><div className="stack" style={{ gap: 0 }}><span className="t-title">{i.name}</span><span className="hint">{i.domain} · since {i.created}</span></div></td>
+                  <td><div className="stack" style={{ gap: 0 }}><span className="t-title">{i.name}</span><span className="hint">{[i.branch, i.address?.city && `${i.address.city}, ${i.address.state}`, i.domain].filter(Boolean).join(' · ')}</span></div></td>
                   <td className="mono ink2">{i.tenant}</td>
                   <td>{i.admin || <span style={{ color: 'var(--returned)' }}>Not assigned</span>}</td>
                   <td className="right num">{i.users}</td>
@@ -53,13 +54,8 @@ export default function Institutes() {
           <div className="pane-head"><div className="stack" style={{ gap: 2 }}><h2>{inst.name}</h2><span className="mono muted">{inst.tenant}</span></div><button className="btn ghost icon sm" onClick={() => setOpen(null)} aria-label="Close"><X /></button></div>
           <div className="pane-body" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div className="row spread">{stTag(inst.status)}<span className="hint">Created {inst.created}</span></div>
-            <section className="stack gap2">
-              <span className="eyebrow">Details & settings</span>
-              <div className="field"><label>Display name</label><input className="input" defaultValue={inst.name} /></div>
-              <div className="field"><label>Email domain</label><input className="input" defaultValue={inst.domain} /><span className="hint">Used to resolve this institute at sign-in.</span></div>
-              <div className="field"><label>ADFS federation metadata URL</label><input className="input" defaultValue={`https://adfs.${inst.domain}/FederationMetadata/2007-06/FederationMetadata.xml`} /></div>
-              <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => toast('Settings saved')}>Save settings</button>
-            </section>
+            <InstituteFields key={inst.id} inst={inst} />
+            <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => toast('Institute details saved')}>Save details</button>
             <div className="divider" />
             <section className="stack gap2">
               <span className="eyebrow">Institute Admin</span>
@@ -84,11 +80,8 @@ export default function Institutes() {
 
       {dlg?.kind === 'create' && (
         <Modal title="New institute" sub="Creates a new isolated tenant with its own ID." onClose={() => setDlg(null)}
-          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" onClick={() => { setDlg(null); toast('Institute created — assign its admin next') }}>Create institute</button></>}>
-          <div className="field"><label>Institute name</label><input className="input" placeholder="e.g. University of Dallas" /></div>
-          <div className="field"><label>Email domain</label><input className="input" placeholder="example.edu" /></div>
-          <div className="field"><label>Tenant ID</label><div className="row gap2"><input className="input mono" readOnly value="tnt_5e2c8a17" /><button className="btn icon" aria-label="Copy"><Copy /></button></div><span className="hint">Generated and permanent.</span></div>
-          <div className="field"><label>ADFS federation metadata URL</label><input className="input" placeholder="https://adfs.example.edu/FederationMetadata/…" /></div>
+          foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" disabled={!valid} onClick={() => { setDlg(null); toast('Institute created — assign its admin next') }}>Create institute</button></>}>
+          <InstituteFields create onValid={setValid} />
         </Modal>
       )}
       {dlg?.kind === 'admin' && (
@@ -114,6 +107,76 @@ export default function Institutes() {
           <div className="field"><label>Type the tenant ID to confirm</label><input className="input mono" placeholder={dlg.inst.tenant} /></div>
         </Modal>
       )}
+    </>
+  )
+}
+
+const TYPES = ['University', 'College', 'Community college', 'Seminary', 'School', 'Other']
+const EMPTY = { name: '', branch: '', type: 'University', website: '', email: '', phones: [{ label: 'Main', number: '' }], address: { line1: '', line2: '', city: '', state: '', postal: '', country: 'United States' }, timezone: 'America/Chicago', domain: '' }
+
+/* Institute details, used when creating an institute and in its settings drawer */
+function InstituteFields({ inst, create, onValid }) {
+  const [f, setF] = useState(() => (inst ? { ...EMPTY, ...inst, phones: inst.phones?.length ? inst.phones : EMPTY.phones } : EMPTY))
+  const set = (k, v) => setF((x) => ({ ...x, [k]: v }))
+  // the parent's Create button only enables once the required fields are filled
+  useEffect(() => { onValid?.(!!f.name.trim() && !!f.domain.trim()) }, [f.name, f.domain])
+  const setAddr = (k, v) => set('address', { ...f.address, [k]: v })
+  const setPhone = (i, k, v) => set('phones', f.phones.map((p, j) => (j === i ? { ...p, [k]: v } : p)))
+  const domain = f.domain || 'example.edu'
+
+  return (
+    <>
+      <section className="stack gap2">
+        <span className="eyebrow">Institute</span>
+        <div className="field"><label>Institute name</label><input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. University of Dallas" /></div>
+        <div className="grid-2" style={{ gap: 12 }}>
+          <div className="field"><label>Branch or campus <span className="hint">(optional)</span></label><input className="input" value={f.branch} onChange={(e) => set('branch', e.target.value)} placeholder="e.g. Irving campus" /></div>
+          <div className="field"><label>Type</label><select className="select" value={f.type} onChange={(e) => set('type', e.target.value)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></div>
+        </div>
+        <div className="grid-2" style={{ gap: 12 }}>
+          <div className="field"><label>Website</label><input className="input" value={f.website} onChange={(e) => set('website', e.target.value)} placeholder="https://example.edu" /></div>
+          <div className="field"><label>General contact email</label><input className="input" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="info@example.edu" /></div>
+        </div>
+      </section>
+
+      <section className="stack gap2">
+        <span className="eyebrow">Phone numbers</span>
+        {f.phones.map((p, i) => (
+          <div key={i} className="row gap2">
+            <input className="input" style={{ width: 150, flex: 'none' }} value={p.label} onChange={(e) => setPhone(i, 'label', e.target.value)} placeholder="Label" aria-label="Phone label" />
+            <input className="input grow" value={p.number} onChange={(e) => setPhone(i, 'number', e.target.value)} placeholder="+1 555-555-0100" aria-label="Phone number" />
+            {f.phones.length > 1 && <button className="btn ghost icon sm" aria-label="Remove phone number" onClick={() => set('phones', f.phones.filter((_, j) => j !== i))}><X /></button>}
+          </div>
+        ))}
+        <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => set('phones', [...f.phones, { label: '', number: '' }])}><Phone />Add phone number</button>
+      </section>
+
+      <section className="stack gap2">
+        <span className="eyebrow">Address</span>
+        <div className="field"><label>Street address</label><input className="input" value={f.address.line1} onChange={(e) => setAddr('line1', e.target.value)} /></div>
+        <div className="field"><label>Address line 2 <span className="hint">(optional)</span></label><input className="input" value={f.address.line2} onChange={(e) => setAddr('line2', e.target.value)} placeholder="Suite, building, floor" /></div>
+        <div className="grid-2" style={{ gap: 12 }}>
+          <div className="field"><label>City</label><input className="input" value={f.address.city} onChange={(e) => setAddr('city', e.target.value)} /></div>
+          <div className="field"><label>State or region</label><input className="input" value={f.address.state} onChange={(e) => setAddr('state', e.target.value)} /></div>
+        </div>
+        <div className="grid-2" style={{ gap: 12 }}>
+          <div className="field"><label>Postal code</label><input className="input" value={f.address.postal} onChange={(e) => setAddr('postal', e.target.value)} /></div>
+          <div className="field"><label>Country</label><input className="input" value={f.address.country} onChange={(e) => setAddr('country', e.target.value)} /></div>
+        </div>
+        <div className="field"><label>Time zone</label>
+          <select className="select" value={f.timezone} onChange={(e) => set('timezone', e.target.value)}>
+            {['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Asia/Kolkata'].map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <span className="hint">Used for timestamps in version history, notifications and exports.</span>
+        </div>
+      </section>
+
+      <section className="stack gap2">
+        <span className="eyebrow">Sign-in</span>
+        <div className="field"><label>Email domain</label><input className="input" value={f.domain} onChange={(e) => set('domain', e.target.value)} placeholder="example.edu" /><span className="hint">Used to resolve this institute at sign-in.</span></div>
+        {create && <div className="field"><label>Tenant ID</label><div className="row gap2"><input className="input mono" readOnly value="tnt_5e2c8a17" /><button className="btn icon" aria-label="Copy"><Copy /></button></div><span className="hint">Generated and permanent.</span></div>}
+        <div className="field"><label>ADFS federation metadata URL</label><input className="input" defaultValue={inst ? `https://adfs.${inst.domain}/FederationMetadata/2007-06/FederationMetadata.xml` : ''} placeholder={`https://adfs.${domain}/FederationMetadata/…`} /></div>
+      </section>
     </>
   )
 }

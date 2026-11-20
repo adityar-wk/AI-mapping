@@ -18,14 +18,16 @@ export const PERSONAS = {
 }
 
 export const DEPARTMENTS = [
-  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', admin: 'Priya Natarajan', users: 14, supervisors: 3, processes: 22, status: 'Active' },
-  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', admin: 'Kevin Marsh', users: 19, supervisors: 4, processes: 31, status: 'Active' },
-  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', admin: 'Alicia Gomez', users: 11, supervisors: 2, processes: 17, status: 'Active' },
-  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', admin: 'Jonah Pierce', users: 8, supervisors: 2, processes: 9, status: 'Active' },
-  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', admin: 'Sara Lindqvist', users: 9, supervisors: 2, processes: 12, status: 'Active' },
-  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', admin: '—', users: 0, supervisors: 0, processes: 0, status: 'Setup pending' },
-  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', admin: '—', users: 0, supervisors: 0, processes: 6, status: 'Archived' },
+  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', admins: ['Priya Natarajan', 'Julian Park'], users: 14, supervisors: 3, processes: 22, status: 'Active' },
+  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', admins: ['Kevin Marsh'], users: 19, supervisors: 4, processes: 31, status: 'Active' },
+  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', admins: ['Alicia Gomez', 'Omar Haddad'], users: 11, supervisors: 2, processes: 17, status: 'Active' },
+  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', admins: ['Jonah Pierce'], users: 8, supervisors: 2, processes: 9, status: 'Active' },
+  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', admins: ['Sara Lindqvist'], users: 9, supervisors: 2, processes: 12, status: 'Active' },
+  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', admins: [], users: 0, supervisors: 0, processes: 0, status: 'Setup pending' },
+  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', admins: [], users: 0, supervisors: 0, processes: 6, status: 'Archived' },
 ]
+
+export const adminEmail = (name, domain = 'udallas.edu') => `${name.split(' ')[0][0]}${name.split(' ').slice(-1)[0]}@${domain}`.toLowerCase()
 
 export const CATEGORIES = ['Grants', 'Compliance', 'Student records', 'Finance', 'Onboarding', 'Communications']
 
@@ -133,10 +135,10 @@ export const GRANTS = [
 ]
 
 export const INSTITUTES = [
-  { id: 'udallas', name: 'University of Dallas', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', admin: 'Thomas Healy', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12' },
-  { id: 'smu-pilot', name: 'Northlake Community College', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', admin: 'Renee Castillo', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01' },
-  { id: 'stmary', name: 'St. Brendan Seminary', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', admin: null, status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03' },
-  { id: 'old', name: 'Trinity Valley Institute', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', admin: 'Mark Ellison', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15' },
+  { id: 'udallas', name: 'University of Dallas', branch: 'Irving campus', type: 'University', website: 'https://udallas.edu', email: 'info@udallas.edu', phones: [{ label: 'Main', number: '+1 972-721-5000' }, { label: 'IT help desk', number: '+1 972-721-5300' }], address: { line1: '1845 E Northgate Dr', line2: '', city: 'Irving', state: 'TX', postal: '75062', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', admin: 'Thomas Healy', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12' },
+  { id: 'smu-pilot', name: 'Northlake Community College', branch: 'Main campus', type: 'Community college', website: 'https://northlake.edu', email: 'contact@northlake.edu', phones: [{ label: 'Main', number: '+1 214-555-0140' }], address: { line1: '5001 N MacArthur Blvd', line2: '', city: 'Irving', state: 'TX', postal: '75038', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', admin: 'Renee Castillo', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01' },
+  { id: 'stmary', name: 'St. Brendan Seminary', branch: '', type: 'Seminary', website: 'https://stbrendan.org', email: 'office@stbrendan.org', phones: [{ label: 'Main', number: '+1 312-555-0188' }], address: { line1: '200 Abbey Rd', line2: '', city: 'Chicago', state: 'IL', postal: '60614', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', admin: null, status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03' },
+  { id: 'old', name: 'Trinity Valley Institute', branch: 'Downtown campus', type: 'College', website: 'https://tvi.edu', email: 'registrar@tvi.edu', phones: [], address: { line1: '90 Commerce St', line2: 'Suite 400', city: 'Fort Worth', state: 'TX', postal: '76102', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', admin: 'Mark Ellison', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15' },
 ]
 
 export const NOTIFICATIONS = {
