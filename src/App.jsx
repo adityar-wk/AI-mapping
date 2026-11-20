@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react'
-import { Routes, Route, Navigate, NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   FileStack, Plus, Library, Inbox, LayoutDashboard, Users, Building2, ShieldCheck, KeyRound, Ban,
   Landmark, BarChart3, SlidersHorizontal, Bell, ChevronRight, LogOut, FlaskConical, FolderKanban, UserCog,
@@ -18,7 +18,6 @@ import ProcessView from './pages/ProcessView'
 import LibraryPage from './pages/Library'
 import Queue from './pages/supervisor/Queue'
 import DeptDashboard from './pages/dept/Dashboard'
-import People from './pages/dept/People'
 import InstOverview from './pages/inst/Overview'
 import DeptAdmins from './pages/inst/Admins'
 import Access from './pages/inst/Access'
@@ -52,9 +51,13 @@ const NAV = {
   ],
   deptAdmin: [
     { label: 'Office of Sponsored Programs', items: [
-      { to: '/dept', icon: LayoutDashboard, label: 'Department summary', end: true },
-      { to: '/dept/people', icon: Users, label: 'Users & supervisors' },
+      { to: '/dept', icon: LayoutDashboard, label: 'Department', end: true },
     ] },
+    { label: 'Review', items: [
+      { to: '/reviews', icon: Inbox, label: 'Review queue', count: 3 },
+      { to: '/department-processes', icon: FolderKanban, label: 'Department processes' },
+    ] },
+    { label: 'Reference', items: [{ to: '/library', icon: Library, label: 'Process library' }] },
   ],
   instAdmin: [
     { label: 'Institute', items: [
@@ -89,7 +92,7 @@ function Shell() {
           </div>
         </div>
 
-        {(role === 'user' || role === 'supervisor') && (
+        {(role === 'user' || role === 'supervisor' || role === 'deptAdmin') && (
           <label className="side-search">
             <Search />
             <input placeholder="Search processes" aria-label="Search processes" />
@@ -141,6 +144,12 @@ function Shell() {
   )
 }
 
+// users & supervisors now live on the department page; keep old links (e.g. ?tab=sups) working
+function PeopleRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/dept${search}`} replace />
+}
+
 export function Topbar({ crumbs = [], title, children, wide }) {
   const { role } = useRole()
   const notes = NOTIFICATIONS[role] || null
@@ -190,7 +199,7 @@ export default function App() {
             <Route path="/department-processes" element={<Queue tab="all" />} />
             <Route path="/reviews" element={<Queue tab="queue" />} />
             <Route path="/dept" element={<DeptDashboard />} />
-            <Route path="/dept/people" element={<People />} />
+            <Route path="/dept/people" element={<PeopleRedirect />} />
             <Route path="/institute" element={<InstOverview />} />
             <Route path="/institute/departments" element={<Navigate to="/institute" replace />} />
             <Route path="/institute/admins" element={<DeptAdmins />} />

@@ -18,16 +18,14 @@ export const PERSONAS = {
 }
 
 export const DEPARTMENTS = [
-  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', admins: ['Priya Natarajan', 'Julian Park'], users: 14, supervisors: 3, processes: 22, status: 'Active' },
-  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', admins: ['Kevin Marsh'], users: 19, supervisors: 4, processes: 31, status: 'Active' },
-  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', admins: ['Alicia Gomez', 'Omar Haddad'], users: 11, supervisors: 2, processes: 17, status: 'Active' },
-  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', admins: ['Jonah Pierce'], users: 8, supervisors: 2, processes: 9, status: 'Active' },
-  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', admins: ['Sara Lindqvist'], users: 9, supervisors: 2, processes: 12, status: 'Active' },
-  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', admins: [], users: 0, supervisors: 0, processes: 0, status: 'Setup pending' },
-  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', admins: [], users: 0, supervisors: 0, processes: 6, status: 'Archived' },
+  { id: 'osp', name: 'Office of Sponsored Programs', desc: 'Pre-award and post-award grant administration.', admin: 'Priya Natarajan', users: 14, supervisors: 3, processes: 22, status: 'Active' },
+  { id: 'reg', name: 'Office of the Registrar', desc: 'Enrollment records, transcripts, degree audit.', admin: 'Kevin Marsh', users: 19, supervisors: 4, processes: 31, status: 'Active' },
+  { id: 'fa', name: 'Financial Aid', desc: 'Aid packaging, verification and disbursement.', admin: 'Alicia Gomez', users: 11, supervisors: 2, processes: 17, status: 'Active' },
+  { id: 'car', name: 'Career Services', desc: 'Student career readiness and employer relations.', admin: 'Jonah Pierce', users: 8, supervisors: 2, processes: 9, status: 'Active' },
+  { id: 'mkt', name: 'Marketing & Communications', desc: 'Brand, web and campaign operations.', admin: 'Sara Lindqvist', users: 9, supervisors: 2, processes: 12, status: 'Active' },
+  { id: 'hr', name: 'Human Resources', desc: 'Hiring, onboarding and employee records.', admin: '—', users: 0, supervisors: 0, processes: 0, status: 'Setup pending' },
+  { id: 'cce', name: 'Continuing Education', desc: 'Merged into the Braniff Graduate School in 2025.', admin: '—', users: 0, supervisors: 0, processes: 6, status: 'Archived' },
 ]
-
-export const adminEmail = (name, domain = 'udallas.edu') => `${name.split(' ')[0][0]}${name.split(' ').slice(-1)[0]}@${domain}`.toLowerCase()
 
 export const CATEGORIES = ['Grants', 'Compliance', 'Student records', 'Finance', 'Onboarding', 'Communications']
 
@@ -113,8 +111,11 @@ export const DOC = {
 }
 
 export const SUPERVISORS = [
+  // the department admin can also act as a supervisor and review submissions
+  { id: 's0', name: 'Priya Natarajan', email: 'pnatarajan@udallas.edu', team: 'Pre-award', users: 0, pending: 0, status: 'Active', history: true, isAdmin: true },
   { id: 's1', name: 'Daniel Reyes', email: 'dreyes@udallas.edu', team: 'Pre-award', users: 5, pending: 3, status: 'Active', history: true },
   { id: 's2', name: 'Angela Wu', email: 'awu@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Deactivated', history: true },
+  { id: 's5', name: 'Lena Ortiz', email: 'lortiz@udallas.edu', team: 'Pre-award', users: 1, pending: 0, status: 'Active', history: true },
   { id: 's3', name: 'Marcus Bell', email: 'mbell@udallas.edu', team: 'Compliance', users: 4, pending: 1, status: 'Active', history: true },
   { id: 's4', name: 'Grace Tran', email: 'gtran@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Invited', history: false },
 ]
@@ -122,7 +123,7 @@ export const SUPERVISORS = [
 export const USERS = [
   { id: 'u1', name: 'Maria Okafor', email: 'mokafor@udallas.edu', supervisor: 'Daniel Reyes', drafts: 1, processes: 4, status: 'Active', history: true, lastActive: '2026-11-16' },
   { id: 'u2', name: 'Leo Brandt', email: 'lbrandt@udallas.edu', supervisor: 'Daniel Reyes', drafts: 0, processes: 3, status: 'Active', history: true, lastActive: '2026-11-15' },
-  { id: 'u3', name: 'Hannah Cole', email: 'hcole@udallas.edu', supervisor: 'Daniel Reyes', drafts: 0, processes: 2, status: 'Active', history: true, lastActive: '2026-11-16' },
+  { id: 'u3', name: 'Hannah Cole', email: 'hcole@udallas.edu', supervisor: 'Lena Ortiz', drafts: 0, processes: 2, status: 'Active', history: true, lastActive: '2026-11-16' },
   { id: 'u4', name: 'Samuel Ortiz', email: 'sortiz@udallas.edu', supervisor: 'Marcus Bell', drafts: 2, processes: 5, status: 'Active', history: true, lastActive: '2026-11-11' },
   { id: 'u5', name: 'Nora Feld', email: 'nfeld@udallas.edu', supervisor: null, drafts: 0, processes: 0, status: 'Invited', history: false, lastActive: '—' },
   { id: 'u6', name: 'Ian Whitaker', email: 'iwhitaker@udallas.edu', supervisor: 'Marcus Bell', drafts: 1, processes: 6, status: 'Deactivated', history: true, lastActive: '2026-09-02' },

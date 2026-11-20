@@ -7,7 +7,7 @@ import { Avatar, Dropdown, Modal, Tag, useToast } from '../../components/ui'
 
 const statusTag = (s) => <Tag kind={s === 'Active' ? 'approved' : s === 'Invited' ? 'review' : 'draft'}>{s}</Tag>
 
-export default function People() {
+export default function People({ title = 'Users & supervisors', lede, summary }) {
   const [qs] = useSearchParams()
   const toast = useToast()
   const [tab, setTab] = useState(qs.get('tab') || 'users')
@@ -16,18 +16,21 @@ export default function People() {
   const [dlg, setDlg] = useState(qs.get('new') ? { kind: 'create' } : null)
   const [q, setQ] = useState('')
   const activeSups = sups.filter((s) => s.status !== 'Deactivated')
+  const teams = [...new Set(sups.map((s) => s.team))]
 
   const setSup = (uid, sup) => { setUsers((u) => u.map((x) => (x.id === uid ? { ...x, supervisor: sup } : x))); toast(`Supervisor changed to ${sup}`) }
 
   return (
     <>
-      <Topbar title="Users & supervisors">
+      <Topbar title={title}>
         <button className="btn primary" onClick={() => setDlg({ kind: 'create' })}><UserPlus />Add person</button>
       </Topbar>
       <div className="page">
         <div className="page-head">
-          <div><p className="lede">Platform profiles link to existing UD accounts. Adding someone sends an invitation; they sign in with ADFS — no new passwords.</p></div>
+          <div><p className="lede">{lede || 'Platform profiles link to existing UD accounts. Adding someone sends an invitation; they sign in with ADFS — no new passwords.'}</p></div>
         </div>
+        {summary}
+        {summary && <h2 style={{ fontSize: 16, marginTop: 8 }}>Users & supervisors</h2>}
 
         <div className="tabs">
             <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Users <span className="hint num">{users.length}</span></button>
@@ -66,22 +69,35 @@ export default function People() {
         )}
 
         {tab === 'sups' && (
-          <div className="card">
-            <table className="table">
-              <thead><tr><th>Name</th><th>Team</th><th className="right">Users</th><th className="right">Pending reviews</th><th>Status</th><th className="actions" /></tr></thead>
-              <tbody>
-                {sups.filter((u) => !q || (u.name + u.email).toLowerCase().includes(q.toLowerCase())).map((s) => (
-                  <tr key={s.id}>
-                    <td><div className="row gap2"><Avatar name={s.name} /><div className="stack" style={{ gap: 0 }}><span className="t-title">{s.name}</span><span className="hint">{s.email}</span></div></div></td>
-                    <td className="ink2">{s.team}</td>
-                    <td className="right num">{s.users}</td>
-                    <td className="right num">{s.pending}</td>
-                    <td>{statusTag(s.status)}{s.status === 'Deactivated' && <div className="hint">Approvals kept in history</div>}</td>
-                    <td className="actions"><RowMenu person={s} kind="supervisor" onPick={(k) => setDlg({ kind: k, person: s, role: 'supervisor' })} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="stack gap4">
+            {/* a team can have several supervisors */}
+            {teams.map((t) => {
+              const list = sups.filter((s) => s.team === t && (!q || (s.name + s.email + s.team).toLowerCase().includes(q.toLowerCase())))
+              if (!list.length) return null
+              const active = list.filter((s) => s.status !== 'Deactivated').length
+              return (
+                <div key={t} className="card">
+                  <div className="card-head">
+                    <div className="stack" style={{ gap: 1 }}><h3>{t}</h3><span className="hint">{active} active supervisor{active === 1 ? '' : 's'} · {users.filter((u) => u.status !== 'Deactivated' && list.some((s) => s.name === u.supervisor)).length} users</span></div>
+                    <button className="btn sm" onClick={() => setDlg({ kind: 'create', role: 'supervisor', team: t })}><UserPlus />Add supervisor to {t}</button>
+                  </div>
+                  <table className="table">
+                    <thead><tr><th>Name</th><th className="right">Users</th><th className="right">Pending reviews</th><th>Status</th><th className="actions" /></tr></thead>
+                    <tbody>
+                      {list.map((s) => (
+                        <tr key={s.id}>
+                          <td><div className="row gap2"><Avatar name={s.name} /><div className="stack" style={{ gap: 0 }}><span className="t-title">{s.name}</span><span className="hint">{s.isAdmin ? <b style={{ color: 'var(--navy)', fontWeight: 600 }}>Department admin · </b> : null}{s.email}</span></div></div></td>
+                          <td className="right num">{users.filter((u) => u.supervisor === s.name && u.status !== 'Deactivated').length}</td>
+                          <td className="right num">{s.pending}</td>
+                          <td>{statusTag(s.status)}{s.status === 'Deactivated' && <div className="hint">Approvals kept in history</div>}</td>
+                          <td className="actions">{!s.isAdmin && <RowMenu person={s} kind="supervisor" onPick={(k) => setDlg({ kind: k, person: s, role: 'supervisor' })} />}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -100,8 +116,8 @@ export default function People() {
         <AddUsersDialog sup={dlg.sup} users={users.filter((u) => u.status !== 'Deactivated' && u.supervisor !== dlg.sup.name)} onClose={() => setDlg(null)}
           onDone={(ids) => { setUsers((all) => all.map((x) => (ids.includes(x.id) ? { ...x, supervisor: dlg.sup.name } : x))); setDlg(null); toast(`${ids.length} user${ids.length > 1 ? 's' : ''} now report to ${dlg.sup.name}`) }} />
       )}
-      {dlg?.kind === 'create' && <CreateDialog onClose={() => setDlg(null)} sups={activeSups} onDone={(n) => { setDlg(null); toast(`Invitation sent to ${n}`) }} />}
-      {dlg?.kind === 'edit' && <CreateDialog edit person={dlg.person} role={dlg.role} onClose={() => setDlg(null)} sups={activeSups} onDone={() => { setDlg(null); toast('Profile updated') }} />}
+      {dlg?.kind === 'create' && <CreateDialog onClose={() => setDlg(null)} sups={activeSups} teams={teams} role={dlg.role} team={dlg.team} onDone={(n) => { setDlg(null); toast(`Invitation sent to ${n}`) }} />}
+      {dlg?.kind === 'edit' && <CreateDialog edit person={dlg.person} role={dlg.role} teams={teams} onClose={() => setDlg(null)} sups={activeSups} onDone={() => { setDlg(null); toast('Profile updated') }} />}
       {dlg?.kind === 'deactivate' && <DeactivateDialog p={dlg.person} role={dlg.role} sups={activeSups.filter((s) => s.name !== dlg.person.name)} users={users.filter((u) => u.status === 'Active' && u.id !== dlg.person.id)} onClose={() => setDlg(null)} onDone={() => { setDlg(null); toast(`${dlg.person.name} deactivated — sessions ended`) }} />}
       {dlg?.kind === 'delete' && (
         <Modal title={`Delete ${dlg.person.name}?`} sub="This permanently removes a profile that has no history." onClose={() => setDlg(null)}
@@ -127,7 +143,7 @@ function RowMenu({ person, kind, onPick }) {
   )
 }
 
-function CreateDialog({ onClose, onDone, sups, edit, person, role: r0 }) {
+function CreateDialog({ onClose, onDone, sups, teams = [], edit, person, role: r0, team: t0 }) {
   const [role, setRole] = useState(r0 || 'user')
   const [name, setName] = useState(person?.name || '')
   const [email, setEmail] = useState(person?.email || '')
@@ -145,12 +161,12 @@ function CreateDialog({ onClose, onDone, sups, edit, person, role: r0 }) {
         <span className="hint row gap1" style={{ gap: 6 }}><ShieldCheck size={12} />{edit ? 'Linked to the UD ADFS identity — cannot be changed here.' : 'Used to link the profile to their existing UD ADFS account.'}</span>
       </div>
       {role === 'user' ? (
-        <div className="field"><label>Supervisor</label><select className="select" defaultValue={person?.supervisor || ''}><option value="">Assign later</option>{sups.map((s) => <option key={s.id}>{s.name}</option>)}</select><span className="hint">Submissions from this user go to their supervisor for review.</span></div>
+        <div className="field"><label>Supervisor</label><select className="select" defaultValue={person?.supervisor || ''}><option value="">Assign later</option>{sups.map((s) => <option key={s.id} value={s.name}>{s.name} · {s.isAdmin ? 'Department admin' : s.team}</option>)}</select><span className="hint">Submissions from this user go to their supervisor for review.</span></div>
       ) : (
         <div className="field"><label htmlFor="team">Team</label>
-          <input id="team" className="input" list="team-options" defaultValue={person?.team || ''} placeholder="Pick a team or type a new one" />
-          <datalist id="team-options">{['Pre-award', 'Post-award', 'Compliance'].map((t) => <option key={t} value={t} />)}</datalist>
-          <span className="hint">Teams are labels within this department. Typing a new name creates it.</span>
+          <input id="team" className="input" list="team-options" defaultValue={person?.team || t0 || ''} placeholder="Pick a team or type a new one" />
+          <datalist id="team-options">{teams.map((t) => <option key={t} value={t} />)}</datalist>
+          <span className="hint">A team can have several supervisors. Pick an existing team to add to it, or type a new name to create one.</span>
         </div>
       )}
     </Modal>
@@ -196,17 +212,22 @@ function ReportingStructure({ users, sups: allSups, onAdd, onMove, q = '' }) {
   return (
     <div className="rs">
       <nav className="rs-list" aria-label="Supervisors">
-        <div className="rs-list-head">Supervisors</div>
-        {sups.map((x) => (
-          <button key={x.id} className={`rs-sup ${sel === x.name ? 'on' : ''}`} onClick={() => setSel(x.name)}>
-            <Avatar name={x.name} />
-            <span className="stack grow" style={{ gap: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 600 }}>{x.name}</span>
-              <span className="hint">{x.team}{x.status === 'Invited' ? ' · invited' : ''}</span>
-            </span>
-            <span className="rs-count">{team(x.name).length}</span>
-          </button>
+        {[...new Set(sups.map((x) => x.team))].map((t) => (
+          <div key={t} className="stack">
+            <div className="rs-list-head">{t}</div>
+            {sups.filter((x) => x.team === t).map((x) => (
+              <button key={x.id} className={`rs-sup ${sel === x.name ? 'on' : ''}`} onClick={() => setSel(x.name)}>
+                <Avatar name={x.name} />
+                <span className="stack grow" style={{ gap: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600 }}>{x.name}</span>
+                  <span className="hint">{x.isAdmin ? 'Department admin' : 'Supervisor'}{x.status === 'Invited' ? ' · invited' : ''}</span>
+                </span>
+                <span className="rs-count">{team(x.name).length}</span>
+              </button>
+            ))}
+          </div>
         ))}
+        <div className="rs-list-head" style={{ paddingTop: 14 }}>Needs a reviewer</div>
         <button className={`rs-sup ${sel === '__none' ? 'on' : ''}`} onClick={() => setSel('__none')}>
           <span className="tile sm amber"><AlertTriangle /></span>
           <span className="stack grow" style={{ gap: 1 }}><span style={{ fontWeight: 600 }}>Unassigned</span><span className="hint">No reviewer yet</span></span>
@@ -221,7 +242,7 @@ function ReportingStructure({ users, sups: allSups, onAdd, onMove, q = '' }) {
               <Avatar name={current.name} />
               <div className="stack" style={{ gap: 1 }}>
                 <h3>{current.name}’s team</h3>
-                <span className="hint">{current.team} · {members.length} user{members.length === 1 ? '' : 's'} · {current.pending} pending review{current.pending === 1 ? '' : 's'}</span>
+                <span className="hint">{current.team} team{current.isAdmin ? ' · department admin' : ''} · {members.length} user{members.length === 1 ? '' : 's'} · {current.pending} pending review{current.pending === 1 ? '' : 's'}</span>
               </div>
             </div>
           ) : (
@@ -249,7 +270,7 @@ function ReportingStructure({ users, sups: allSups, onAdd, onMove, q = '' }) {
                     <select className="select move-select" value="" aria-label={current ? `Move ${u.name} to another supervisor` : `Assign ${u.name} to a supervisor`}
                       onChange={(e) => e.target.value && onMove(u, e.target.value)}>
                       <option value="">{current ? 'Move to…' : 'Assign to…'}</option>
-                      {allSups.filter((x) => x.name !== u.supervisor).map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
+                      {allSups.filter((x) => x.name !== u.supervisor).map((x) => <option key={x.id} value={x.name}>{x.name} · {x.team}</option>)}
                     </select>
                   </td>
                 </tr>
@@ -271,7 +292,7 @@ function ChangeSupervisorDialog({ user, sups, onClose, onDone }) {
       <div className="field"><label>New supervisor</label>
         <select className="select" value={to} onChange={(e) => setTo(e.target.value)}>
           <option value="">Choose a supervisor…</option>
-          {options.map((x) => <option key={x.id} value={x.name}>{x.name} · {x.team}</option>)}
+          {options.map((x) => <option key={x.id} value={x.name}>{x.name} · {x.isAdmin ? 'Department admin' : x.team}</option>)}
         </select>
       </div>
       {user.supervisor && <div className="notice info"><Info /><span>Submissions waiting for review move to the new supervisor, with their feedback history.</span></div>}
