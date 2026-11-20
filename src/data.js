@@ -111,8 +111,11 @@ export const DOC = {
 }
 
 export const SUPERVISORS = [
+  // the department admin can also act as a supervisor and review submissions
+  { id: 's0', name: 'Priya Natarajan', email: 'pnatarajan@udallas.edu', team: 'Pre-award', users: 0, pending: 0, status: 'Active', history: true, isAdmin: true },
   { id: 's1', name: 'Daniel Reyes', email: 'dreyes@udallas.edu', team: 'Pre-award', users: 5, pending: 3, status: 'Active', history: true },
   { id: 's2', name: 'Angela Wu', email: 'awu@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Deactivated', history: true },
+  { id: 's5', name: 'Lena Ortiz', email: 'lortiz@udallas.edu', team: 'Pre-award', users: 1, pending: 0, status: 'Active', history: true },
   { id: 's3', name: 'Marcus Bell', email: 'mbell@udallas.edu', team: 'Compliance', users: 4, pending: 1, status: 'Active', history: true },
   { id: 's4', name: 'Grace Tran', email: 'gtran@udallas.edu', team: 'Post-award', users: 0, pending: 0, status: 'Invited', history: false },
 ]
@@ -120,7 +123,7 @@ export const SUPERVISORS = [
 export const USERS = [
   { id: 'u1', name: 'Maria Okafor', email: 'mokafor@udallas.edu', supervisor: 'Daniel Reyes', drafts: 1, processes: 4, status: 'Active', history: true, lastActive: '2026-11-16' },
   { id: 'u2', name: 'Leo Brandt', email: 'lbrandt@udallas.edu', supervisor: 'Daniel Reyes', drafts: 0, processes: 3, status: 'Active', history: true, lastActive: '2026-11-15' },
-  { id: 'u3', name: 'Hannah Cole', email: 'hcole@udallas.edu', supervisor: 'Daniel Reyes', drafts: 0, processes: 2, status: 'Active', history: true, lastActive: '2026-11-16' },
+  { id: 'u3', name: 'Hannah Cole', email: 'hcole@udallas.edu', supervisor: 'Lena Ortiz', drafts: 0, processes: 2, status: 'Active', history: true, lastActive: '2026-11-16' },
   { id: 'u4', name: 'Samuel Ortiz', email: 'sortiz@udallas.edu', supervisor: 'Marcus Bell', drafts: 2, processes: 5, status: 'Active', history: true, lastActive: '2026-11-11' },
   { id: 'u5', name: 'Nora Feld', email: 'nfeld@udallas.edu', supervisor: null, drafts: 0, processes: 0, status: 'Invited', history: false, lastActive: '—' },
   { id: 'u6', name: 'Ian Whitaker', email: 'iwhitaker@udallas.edu', supervisor: 'Marcus Bell', drafts: 1, processes: 6, status: 'Deactivated', history: true, lastActive: '2026-09-02' },
@@ -133,10 +136,10 @@ export const GRANTS = [
 ]
 
 export const INSTITUTES = [
-  { id: 'udallas', name: 'University of Dallas', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', admin: 'Thomas Healy', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12' },
-  { id: 'smu-pilot', name: 'Northlake Community College', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', admin: 'Renee Castillo', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01' },
-  { id: 'stmary', name: 'St. Brendan Seminary', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', admin: null, status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03' },
-  { id: 'old', name: 'Trinity Valley Institute', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', admin: 'Mark Ellison', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15' },
+  { id: 'udallas', name: 'University of Dallas', branch: 'Irving campus', type: 'University', website: 'https://udallas.edu', email: 'info@udallas.edu', phones: [{ label: 'Main', number: '+1 972-721-5000' }, { label: 'IT help desk', number: '+1 972-721-5300' }], address: { line1: '1845 E Northgate Dr', line2: '', city: 'Irving', state: 'TX', postal: '75062', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', admin: 'Thomas Healy', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12' },
+  { id: 'smu-pilot', name: 'Northlake Community College', branch: 'Main campus', type: 'Community college', website: 'https://northlake.edu', email: 'contact@northlake.edu', phones: [{ label: 'Main', number: '+1 214-555-0140' }], address: { line1: '5001 N MacArthur Blvd', line2: '', city: 'Irving', state: 'TX', postal: '75038', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', admin: 'Renee Castillo', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01' },
+  { id: 'stmary', name: 'St. Brendan Seminary', branch: '', type: 'Seminary', website: 'https://stbrendan.org', email: 'office@stbrendan.org', phones: [{ label: 'Main', number: '+1 312-555-0188' }], address: { line1: '200 Abbey Rd', line2: '', city: 'Chicago', state: 'IL', postal: '60614', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_c40e7a11', domain: 'stbrendan.org', admin: null, status: 'Suspended', users: 9, processes: 4, storage: 0.8, storageCap: 20, ai: 12_400, created: '2026-03-03' },
+  { id: 'old', name: 'Trinity Valley Institute', branch: 'Downtown campus', type: 'College', website: 'https://tvi.edu', email: 'registrar@tvi.edu', phones: [], address: { line1: '90 Commerce St', line2: 'Suite 400', city: 'Fort Worth', state: 'TX', postal: '76102', country: 'United States' }, timezone: 'America/Chicago', tenant: 'tnt_99ad0f52', domain: 'tvi.edu', admin: 'Mark Ellison', status: 'Archived', users: 0, processes: 48, storage: 9.7, storageCap: 50, ai: 0, created: '2025-09-15' },
 ]
 
 export const NOTIFICATIONS = {

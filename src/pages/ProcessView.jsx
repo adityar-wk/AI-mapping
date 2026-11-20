@@ -12,6 +12,7 @@ export default function ProcessView() {
   const { id } = useParams()
   const [qs] = useSearchParams()
   const { role } = useRole()
+  const reviewer = role === 'supervisor' || role === 'deptAdmin'
   const nav = useNavigate()
   const toast = useToast()
   const p = PROCESSES.find((x) => x.id === id) || PROCESSES[0]
@@ -33,13 +34,13 @@ export default function ProcessView() {
 
   return (
     <>
-      <Topbar wide crumbs={[{ label: role === 'supervisor' ? 'Department processes' : 'Process library', to: role === 'supervisor' ? '/department-processes' : '/library' }, { label: p.dept }, { label: p.name }]}>
+      <Topbar wide crumbs={[{ label: reviewer ? 'Department processes' : 'Process library', to: reviewer ? '/department-processes' : '/library' }, { label: p.dept }, { label: p.name }]}>
         <button className="btn" onClick={() => setDlg('export')}><Download />Export</button>
-        {role === 'supervisor' && ownDept && p.status === 'approved' && (
+        {reviewer && ownDept && p.status === 'approved' && (
           <button className="btn primary" onClick={() => setDlg('reopen')} disabled={!!activeDraft} title={activeDraft ? 'A draft is already open' : ''}><GitBranchPlus />Reopen as new draft</button>
         )}
         {/* a process waiting for this supervisor can be decided from here, or reviewed in the workspace */}
-        {role === 'supervisor' && ownDept && underReview && (
+        {reviewer && ownDept && underReview && (
           <>
             <button className="btn" onClick={() => nav(`/review/${p.id}`)}><MessageSquareText />Review with AI</button>
             <button className="btn" onClick={() => setDlg('return')}><CornerUpLeft />Return</button>
@@ -67,7 +68,7 @@ export default function ProcessView() {
       </div>
 
       {qs.get('approved') && <div className="lock-banner" style={{ background: 'var(--approved-wash)', color: '#1f4a35' }}><BadgeCheck />Approved and published. {p.creator} has been notified.</div>}
-      {underReview && (role === 'supervisor'
+      {underReview && (reviewer
         ? <LockedNote>Submitted by {p.creator} for your review. Approve or return it here, or open Review with AI to revise it first.</LockedNote>
         : <LockedNote>Under review by {p.supervisor}. You can view it, but editing is locked until the review is complete.</LockedNote>)}
       {isHistorical && <div className="lock-banner" style={{ background: 'var(--well)', color: 'var(--ink-2)' }}><History />You’re viewing a historical version. v{approvedVs[0].v} is the current approved version.</div>}
