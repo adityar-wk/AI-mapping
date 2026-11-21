@@ -149,12 +149,6 @@ export const USERS = [
   { id: 'u6', name: 'Ian Whitaker', email: 'iwhitaker@udallas.edu', supervisor: 'Marcus Bell', drafts: 1, processes: 6, status: 'Deactivated', history: true, lastActive: '2026-09-02' },
 ].map((p, i) => withProfile(p, i + 10))
 
-export const GRANTS = [
-  { id: 'g2', kind: 'Department', who: 'Office of Sponsored Programs', target: 'Career Services', by: 'Thomas Healy', at: '2026-08-12' },
-  { id: 'g3', kind: 'Department', who: 'Financial Aid', target: 'Office of the Registrar', by: 'Thomas Healy', at: '2026-05-20' },
-  { id: 'g5', kind: 'Department', who: 'Office of Sponsored Programs', target: 'Marketing & Communications', by: 'Thomas Healy', at: '2026-10-22' },
-]
-
 export const INSTITUTES = [
   { id: 'udallas', name: 'University of Dallas', tenant: 'tnt_7f3a91c2', domain: 'udallas.edu', status: 'Active', users: 61, processes: 97, storage: 18.4, storageCap: 50, ai: 412_000, created: '2026-05-12', website: 'https://udallas.edu', address: '1845 E Northgate Dr', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75062', campuses: ['Irving Campus', 'Rome Campus'], sso: { status: 'Active', discoveryUrl: 'https://sso.udallas.edu/adfs/.well-known/openid-configuration', clientId: '7c1e4b9a-2f6d-4e8a-9b3c-51d0a7e2f4c8', secretSetAt: '2026-05-14', lastTest: { ok: true, at: '2026-05-14 10:42' } }, description: 'Private Catholic university with undergraduate, graduate and business programs.' },
   { id: 'smu-pilot', name: 'Northlake Community College', tenant: 'tnt_2b81d0e4', domain: 'northlake.edu', status: 'Active', users: 23, processes: 31, storage: 6.1, storageCap: 50, ai: 158_000, created: '2026-08-01', website: 'https://northlake.edu', address: '5001 N MacArthur Blvd', country: 'United States', state: 'Texas', city: 'Irving', zipcode: '75038', campuses: ['Main Campus'], sso: { status: 'Draft', discoveryUrl: 'https://adfs.northlake.edu/adfs/.well-known/openid-configuration', clientId: 'b2d9f0c4-61a7-4c3e-8f15-9e0a2c7d6b31', secretSetAt: '2026-11-18', lastTest: null }, description: '' },
@@ -173,7 +167,7 @@ export const INSTITUTE_ADMINS = [
 export const NOTIFICATIONS = {
   user: [
     { id: 1, kind: 'returned', title: 'Effort certification cycle was returned', body: 'Daniel Reyes: "The PI attestation step is missing the 30-day deadline…"', at: '2 days ago', to: '/process/p-097/edit', unread: true, channel: 'In-app · Email' },
-    { id: 2, kind: 'approved', title: 'No-cost extension request approved as v1.2', body: 'Published to the Office of Sponsored Programs library.', at: 'Oct 28', to: '/process/p-082', unread: false, channel: 'In-app · Email' },
+    { id: 2, kind: 'approved', title: 'No-cost extension request approved as v1.2', body: 'Version 1.2 is now the approved version.', at: 'Oct 28', to: '/process/p-082', unread: false, channel: 'In-app · Email' },
   ],
   supervisor: [
     { id: 3, kind: 'review', title: 'Award acceptance and account setup submitted', body: 'Hannah Cole submitted v1.0 for your review.', at: '4 hours ago', to: '/review/p-140', unread: true, channel: 'In-app · Email' },

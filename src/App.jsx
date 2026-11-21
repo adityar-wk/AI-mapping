@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from 'react'
-import { Routes, Route, Navigate, NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
-  FileStack, Plus, Library, Inbox, LayoutDashboard, Users, Building2, ShieldCheck, KeyRound, Ban,
+  FileStack, Plus, Inbox, LayoutDashboard, Users, Building2, ShieldCheck, KeyRound, Ban,
   Landmark, BarChart3, SlidersHorizontal, Bell, ChevronRight, LogOut, FlaskConical, FolderKanban, UserCog,
   Search, Component, TriangleAlert, ChevronDown,
 } from 'lucide-react'
@@ -15,15 +15,14 @@ import Capture from './pages/user/Capture'
 import Extraction from './pages/user/Extraction'
 import Editor from './pages/Editor'
 import ProcessView from './pages/ProcessView'
-import LibraryPage from './pages/Library'
 import Queue from './pages/supervisor/Queue'
 import DeptDashboard from './pages/dept/Dashboard'
 import People from './pages/dept/People'
 import InstOverview from './pages/inst/Overview'
 import DeptAdmins from './pages/inst/Admins'
-import Access from './pages/inst/Access'
 import Suspensions from './pages/inst/Suspensions'
 import Institutes from './pages/platform/Institutes'
+import InstituteDetail from './pages/platform/InstituteDetail'
 import Usage from './pages/platform/Usage'
 import UserManagement from './pages/platform/UserManagement'
 import States from './pages/States'
@@ -42,14 +41,12 @@ const NAV = {
       { to: '/home', icon: FileStack, label: 'My processes', count: 4 },
       { to: '/capture/new', icon: Plus, label: 'New process' },
     ] },
-    { label: 'Reference', items: [{ to: '/library', icon: Library, label: 'Process library' }] },
   ],
   supervisor: [
     { label: 'Review', items: [
       { to: '/reviews', icon: Inbox, label: 'Review queue', count: 3 },
       { to: '/department-processes', icon: FolderKanban, label: 'Department processes' },
     ] },
-    { label: 'Reference', items: [{ to: '/library', icon: Library, label: 'Process library' }] },
   ],
   deptAdmin: [
     { label: 'Office of Sponsored Programs', items: [
@@ -63,13 +60,12 @@ const NAV = {
       { to: '/institute/admins', icon: UserCog, label: 'Department admins' },
     ] },
     { label: 'Access', items: [
-      { to: '/institute/access', icon: ShieldCheck, label: 'Library access' },
       { to: '/institute/suspensions', icon: Ban, label: 'User suspension' },
     ] },
   ],
   superAdmin: [
     { label: 'Platform', items: [
-      { to: '/platform', icon: Landmark, label: 'Institutes', end: true },
+      { to: '/platform', icon: Landmark, label: 'Institutes', end: true, also: '/platform/institutes' },
       { to: '/platform/users', icon: UserCog, label: 'User management' },
       { to: '/platform/usage', icon: BarChart3, label: 'Usage by institute' },
     ] },
@@ -78,6 +74,7 @@ const NAV = {
 
 function Shell() {
   const { role, setRole } = useRole()
+  const { pathname } = useLocation()
   const p = PERSONAS[role]
   const nav = useNavigate()
   return (
@@ -102,7 +99,7 @@ function Shell() {
           <nav key={g.label} className="nav-group" aria-label={g.label}>
             <div className="nav-label">{g.label}</div>
             {g.items.map((it) => (
-              <NavLink key={it.to} to={it.to} end={it.end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <NavLink key={it.to} to={it.to} end={it.end} className={({ isActive }) => `nav-item ${isActive || (it.also && pathname.startsWith(it.also)) ? 'active' : ''}`}>
                 <it.icon />{it.label}{it.count != null && <span className="nav-count">{it.count}</span>}
               </NavLink>
             ))}
@@ -188,7 +185,6 @@ export default function App() {
             <Route path="/process/:id/edit" element={<Editor mode="author" />} />
             <Route path="/review/:id" element={<Editor mode="review" />} />
             <Route path="/process/:id" element={<ProcessView />} />
-            <Route path="/library" element={<LibraryPage />} />
             <Route path="/department-processes" element={<Queue tab="all" />} />
             <Route path="/reviews" element={<Queue tab="queue" />} />
             <Route path="/dept" element={<DeptDashboard />} />
@@ -196,9 +192,10 @@ export default function App() {
             <Route path="/institute" element={<InstOverview />} />
             <Route path="/institute/departments" element={<Navigate to="/institute" replace />} />
             <Route path="/institute/admins" element={<DeptAdmins />} />
-            <Route path="/institute/access" element={<Access />} />
             <Route path="/institute/suspensions" element={<Suspensions />} />
             <Route path="/platform" element={<Institutes />} />
+            <Route path="/platform/institutes/:id" element={<InstituteDetail />} />
+            <Route path="/platform/institutes/:id/:tab" element={<InstituteDetail />} />
             <Route path="/platform/usage" element={<Usage />} />
             <Route path="/platform/users" element={<UserManagement />} />
             <Route path="/states" element={<States />} />

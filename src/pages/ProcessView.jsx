@@ -26,14 +26,13 @@ export default function ProcessView() {
   const isHistorical = viewing.state === 'historical'
   const activeDraft = versions.find((v) => v.state === 'draft')
   const ownDept = p.dept === 'Office of Sponsored Programs'
-  const crossView = !ownDept
   const underReview = p.status === 'review'
   const files = sourcesFor(p.id).files
   const sealStatus = underReview ? 'review' : isHistorical ? 'draft' : 'approved'
 
   return (
     <>
-      <Topbar wide crumbs={[{ label: role === 'supervisor' ? 'Department processes' : 'Process library', to: role === 'supervisor' ? '/department-processes' : '/library' }, { label: p.dept }, { label: p.name }]}>
+      <Topbar wide crumbs={[{ label: role === 'supervisor' ? 'Department processes' : 'My processes', to: role === 'supervisor' ? '/department-processes' : '/home' }, { label: p.dept }, { label: p.name }]}>
         <button className="btn" onClick={() => setDlg('export')}><Download />Export</button>
         {role === 'supervisor' && ownDept && p.status === 'approved' && (
           <button className="btn primary" onClick={() => setDlg('reopen')} disabled={!!activeDraft} title={activeDraft ? 'A draft is already open' : ''}><GitBranchPlus />Reopen as new draft</button>
@@ -72,7 +71,6 @@ export default function ProcessView() {
         : <LockedNote>Under review by {p.supervisor}. You can view it, but editing is locked until the review is complete.</LockedNote>)}
       {isHistorical && <div className="lock-banner" style={{ background: 'var(--well)', color: 'var(--ink-2)' }}><History />You’re viewing a historical version. v{approvedVs[0].v} is the current approved version.</div>}
       {activeDraft && !isHistorical && !underReview && <div className="lock-banner"><Lock />v{viewV} is locked. A draft (v{activeDraft.v}) is in progress and won’t replace this version until it’s approved.</div>}
-      {crossView && <div className="lock-banner" style={{ background: 'var(--well)', color: 'var(--ink-2)' }}><Eye />View-only access to {p.dept}, granted by your Institute Admin.{p.archivedDept && ' This department is archived; its approved processes are preserved.'}</div>}
 
       <div className="page wide" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 24, alignItems: 'start' }}>
         <div className="stack gap4" style={{ minWidth: 0 }}>
@@ -117,9 +115,8 @@ export default function ProcessView() {
             <div className="stack gap2" style={{ padding: '4px 16px 16px' }}>
               {files.length === 0 && <span className="hint">No documents were uploaded for this process.</span>}
               {files.map((f) => (
-                <div key={f.name} className="file side-file"><FileIcon ext={f.ext} /><div className="stack" style={{ gap: 2, minWidth: 0 }}><span className="small" style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{f.name}</span><span className="hint">{f.meta} · used for {f.usedIn.map((v) => `v${v}`).join(', ')}</span></div><button className="btn sm" disabled={crossView} title={crossView ? 'Source documents are limited to the owning department' : ''}>Open</button></div>
+                <div key={f.name} className="file side-file"><FileIcon ext={f.ext} /><div className="stack" style={{ gap: 2, minWidth: 0 }}><span className="small" style={{ fontWeight: 500, overflowWrap: 'anywhere' }}>{f.name}</span><span className="hint">{f.meta} · used for {f.usedIn.map((v) => `v${v}`).join(', ')}</span></div><button className="btn sm">Open</button></div>
               ))}
-              {crossView && files.length > 0 && <span className="hint">Source documents are limited to the owning department.</span>}
             </div>
           </div>
 

@@ -96,7 +96,7 @@ export function ApproveDialog({ onClose, onDone, author, version, dept, blocked,
       {blocked && <div className="notice err"><AlertTriangle /><span><b>The map and document don’t match.</b> Update the document from the map before approving. Mismatched pairs can’t be approved.</span></div>}
       <div className="stack gap2 small ink2">
         <span className="row gap2"><Lock size={14} />v{version} becomes read-only. Future changes start a new draft.</span>
-        <span className="row gap2"><BadgeCheck size={14} />Published to the {dept} library for permitted viewers.</span>
+        <span className="row gap2"><BadgeCheck size={14} />Becomes the approved version in {dept}.</span>
         <span className="row gap2"><Mail size={14} />{author} is notified by email and in the app, with your note.</span>
       </div>
       <div className="field">
@@ -110,7 +110,7 @@ export function ApproveDialog({ onClose, onDone, author, version, dept, blocked,
           {tags.map((t) => <span key={t} className="chip">#{t}<button className="chip-x" aria-label={`Remove ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}>×</button></span>)}
           <input className="input" style={{ width: 140, height: 28 }} value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} placeholder="Add tag" aria-label="Add tag" />
         </div>
-        <span className="hint">Suggested by AI from the map and document. You confirm them — they’re used for library search.</span>
+        <span className="hint">Suggested by AI from the map and document. You confirm them — they’re fixed when the process is approved.</span>
       </div>
       <div className="field"><label>Note to {author} <span className="hint">(optional)</span></label><textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Thanks — I clarified the Dean threshold before approving." /></div>
       <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>

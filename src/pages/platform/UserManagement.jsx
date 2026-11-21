@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, Eye } from 'lucide-react'
 import { Topbar } from '../../App'
 import { CreateAdmin, AdminProfile, adminName, statusTag } from '../../components/AdminForm'
@@ -18,7 +19,11 @@ const instituteScope = (institutes) => ({
 export default function UserManagement() {
   const { institutes, admins } = usePlatform()
   const [q, setQ] = useState('')
-  const [creating, setCreating] = useState(false)
+  // ?new=<instituteId> (from an institute's page) opens Create with that institute selected
+  const [qs, setQs] = useSearchParams()
+  const preset = qs.get('new') || ''
+  const [creating, setCreating] = useState(Boolean(preset))
+  const closeCreate = () => { setCreating(false); if (preset) setQs({}, { replace: true }) }
   const [openId, setOpenId] = useState(null)
   const instName = (id) => institutes.find((i) => i.id === id)?.name || '—'
   const rows = admins.filter((a) => !q || `${adminName(a)} ${instName(a.instituteId)} ${a.email}`.toLowerCase().includes(q.toLowerCase()))
@@ -56,7 +61,7 @@ export default function UserManagement() {
       </div>
 
       {creating && (
-        <CreateAdmin scope={scope} people={admins} onClose={() => setCreating(false)}
+        <CreateAdmin scope={scope} people={admins} preset={preset} onClose={closeCreate}
           sub="Onboard an Institute Admin. They get an email to activate their account (email OTP, then set a password) or can sign in with ADFS if it’s enabled."
           onCreate={(v) => platform.addAdmin({ ...v, id: `ia-${Date.now()}`, status: 'Invited', created: new Date().toISOString().slice(0, 10) })} />
       )}

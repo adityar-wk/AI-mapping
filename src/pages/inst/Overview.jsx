@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, MoreHorizontal, PenLine, Archive, Ban, Search, UserPlus, Replace } from 'lucide-react'
 import { Topbar } from '../../App'
-import { GRANTS, INSTITUTE } from '../../data'
+import { INSTITUTE } from '../../data'
 import { Tag, Dropdown, Modal, FilterButton, useToast } from '../../components/ui'
 import { adminName } from '../../components/AdminForm'
 import { useInstitute, inst, adminsOf } from './store'
@@ -41,13 +41,13 @@ export default function InstOverview() {
         <button className="btn primary" onClick={() => setDlg({ kind: 'create' })}><Plus />New department</button>
       </Topbar>
       <div className="page">
-        <p className="lede muted">Departments, people and library access across your institute · tenant <span className="mono">{INSTITUTE.tenant}</span></p>
+        <p className="lede muted">Departments and people across your institute · tenant <span className="mono">{INSTITUTE.tenant}</span></p>
 
         <div className="ledger">
           <div><span className="eyebrow">Departments</span><span className="big">{departments.length}</span><span className="sub">{count('Active')} active · {count('Archived')} archived{noAdminCount ? ` · ${noAdminCount} without an admin` : ''}</span></div>
           <div><span className="eyebrow">People</span><span className="big">{sum('users') + sum('supervisors')}</span><span className="sub">{sum('users')} users · {sum('supervisors')} supervisors</span></div>
           <div><span className="eyebrow">Processes</span><span className="big">{sum('processes')}</span><span className="sub">across all departments</span></div>
-          <div><span className="eyebrow">Library grants</span><span className="big">{GRANTS.length}</span><span className="sub">cross-department, view-only</span></div>
+          <div><span className="eyebrow">Department admins</span><span className="big">{admins.filter((a) => a.status !== 'Deactivated').length}</span><span className="sub">{admins.filter((a) => a.status === 'Invited').length} invited, not yet active</span></div>
         </div>
 
         <div className="stack gap4">
@@ -122,7 +122,7 @@ export default function InstOverview() {
             foot={<><button className="btn ghost" onClick={() => setDlg(null)}>Cancel</button><button className="btn primary" disabled={blocked} onClick={() => { inst.updateDepartment(dlg.d.id, { status: 'Archived' }); setDlg(null); toast('Department archived') }}><Archive />Archive</button></>}>
             {blocked
               ? <div className="notice warn"><Ban /><span><b>{people + adms} people still hold a role here</b> ({people} users and supervisors, {adms} department admins). Reassign or deactivate them, and resolve pending reviews, before archiving.</span></div>
-              : <p className="ink2">Its {dlg.d.processes} approved processes, versions and audit history are kept and stay viewable to people with access.</p>}
+              : <p className="ink2">Its {dlg.d.processes} approved processes, versions and audit history are kept.</p>}
           </Modal>
         )
       })()}

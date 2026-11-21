@@ -16,8 +16,8 @@ export default function States() {
             <Gate icon={<Ban />} code="FR-AUTH-04" title="Your access is suspended" body="Your Institute Admin has suspended your access. Your work is kept. Contact them if you think this is a mistake." action="Sign out" />
             <Gate icon={<Building />} code="FR-AUTH-04" title="Institute access paused" body="Access for St. Brendan Seminary is currently suspended. No changes were made to its data." action="Sign out" />
             <Gate icon={<LogOut />} code="EC-08" title="Your session has ended" body="Your access changed while you were working. Anything you saved before is safe; the last action was not applied." action="Sign in again" />
-            <Gate icon={<ShieldOff />} code="FR-AUTH-03" title="You don’t have access to this page" body="This link points to a process outside your permitted libraries. Ask your Institute Admin if you need it." action="Go to my processes" />
-            <Gate icon={<Lock />} code="EC-09" title="Restricted dependency" body="A step links to a process in a library you can’t open. Its name and content are hidden." action="Ask for access" ghost />
+            <Gate icon={<ShieldOff />} code="FR-AUTH-03" title="You don’t have access to this page" body="This link points to a process you can’t open. Only its author and the department’s supervisors can see it." action="Go to my processes" />
+            <Gate icon={<Lock />} code="EC-09" title="Restricted dependency" body="A step links to a process you can’t open. Its name and content are hidden." action="Go to my processes" ghost />
           </div>
         </Section>
 
